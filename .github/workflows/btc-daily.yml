@@ -1,0 +1,40 @@
+name: BTC Daily Strategy (EN channel)
+
+on:
+  schedule:
+    # 01:10 UTC = 08:10 Vietnam time. GitHub cron often starts late, so the job
+    # starts early and the script waits until exactly 08:30 before posting.
+    - cron: "10 1 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print the post (do not send to Telegram)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: btc-daily-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Post BTC daily strategy
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          # ENGLISH channel only. Override with the TELEGRAM_CHAT_ID_EN secret if needed.
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_EN || '@valuealphacrypto' }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python btc_daily_bot.py --dry-run
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            python btc_daily_bot.py --wait-until 08:30
+          else
+            python btc_daily_bot.py
+          fi
