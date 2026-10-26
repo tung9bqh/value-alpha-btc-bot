@@ -1,0 +1,20 @@
+name: Post NOW to EN channel
+
+# Manual button: posts today's BTC strategy to the English channel immediately.
+on:
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Post BTC daily strategy
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_EN || '@valuealphacrypto' }}
+        run: python btc_daily_bot.py
