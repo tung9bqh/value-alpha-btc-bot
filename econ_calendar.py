@@ -360,11 +360,14 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="print the caption and save the image, send nothing")
     p.add_argument("--wait-until", metavar="HH:MM", help="sleep until this local time before posting")
     p.add_argument("--out", default="econ_calendar.png", help="where to save the image")
+    p.add_argument("--as-of", metavar="ISO_TIME", help="preview as if run at this time, e.g. 2026-10-28T05:00Z")
     args = p.parse_args()
 
     if args.wait_until:
         bot.wait_until(args.wait_until)
     now_utc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    if args.as_of:
+        now_utc = datetime.fromisoformat(args.as_of.replace("Z", "+00:00")).astimezone(timezone.utc)
     feed = fetch_feed()
     events = todays_events(feed, now_utc)
     if args.dry_run:  # show what the feed contains, to make quiet days easy to verify

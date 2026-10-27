@@ -12,6 +12,10 @@ on:
         description: "Only preview the image + caption (do not send to Telegram)"
         type: boolean
         default: true
+      as_of:
+        description: "Preview only: pretend the run happens at this UTC time (e.g. 2026-10-28T05:00Z)"
+        type: string
+        default: ""
 
 permissions:
   contents: write  # dry-run preview on the 'preview-econ' branch
@@ -38,7 +42,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
-            python econ_calendar.py --dry-run | tee preview.txt
+            python econ_calendar.py --dry-run ${{ inputs.as_of && format('--as-of {0}', inputs.as_of) || '' }} | tee preview.txt
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             python econ_calendar.py --wait-until 12:00
           else
