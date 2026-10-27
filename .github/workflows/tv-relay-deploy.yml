@@ -93,24 +93,27 @@ jobs:
 
       - name: Health check
         if: steps.check.outputs.ready == 'true'
+        id: health
         env:
           URL: ${{ steps.cf.outputs.url }}
         run: |
-          for i in $(seq 1 12); do
-            if curl -fsS "$URL" | grep -q "tv-relay ok"; then ok=1; break; fi
-            sleep 5
+          # A new workers.dev subdomain needs a few minutes for its TLS certificate.
+          for i in $(seq 1 40); do
+            if curl -fsS "$URL" 2>/dev/null | grep -q "tv-relay ok"; then ok=1; break; fi
+            sleep 15
           done
+          echo "ok=${ok:-}" >> "$GITHUB_OUTPUT"
           {
             echo "### TradingView relay deployed"
             echo "Webhook URL for TradingView alerts:"
             echo '```'
             echo "$URL"
             echo '```'
-            [ -n "$ok" ] && echo "Health check: OK" || echo "Health check: not reachable yet (new workers.dev URLs can take a few minutes)"
+            [ -n "$ok" ] && echo "Health check: OK" || echo "Health check: not reachable yet (new workers.dev URLs can take up to ~15 minutes, run again later)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Test signal + reply
-        if: steps.check.outputs.ready == 'true' && inputs.test_chat_id != ''
+        if: steps.check.outputs.ready == 'true' && steps.health.outputs.ok == '1' && inputs.test_chat_id != ''
         env:
           URL: ${{ steps.cf.outputs.url }}
           CHAT: ${{ inputs.test_chat_id }}
