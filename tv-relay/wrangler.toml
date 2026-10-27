@@ -1,0 +1,10 @@
+# Cloudflare Worker: TradingView -> Telegram relay.
+# Deployed by .github/workflows/tv-relay-deploy.yml, which appends the
+# [[kv_namespaces]] binding (TRADES) with the namespace id at deploy time.
+name = "tv-relay"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+[vars]
+CHAT_ID = "@valuealphacrypto"

@@ -45,6 +45,21 @@ Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOI
 - Chạy thử: tab *Actions → Economic Calendar (EN channel) → Run workflow* (để tích `dry_run`).
 - Font tiêu đề (Anton, Bebas Neue, Great Vibes) nằm trong `fonts/`, giấy phép SIL Open Font License.
 
+## Call tín hiệu từ TradingView (M5)
+Chỉ báo *EMA V2.1 Pro* trên TradingView gửi alert qua webhook tới một **Cloudflare Worker** (`tv-relay/`),
+Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào lệnh** (lưu `message_id` theo mã lệnh trong KV).
+- Cài lần đầu: tạo tài khoản Cloudflare (miễn phí) → *My Profile → API Tokens → Create Token* → mẫu
+  **Edit Cloudflare Workers**. Thêm vào *Settings → Secrets and variables → Actions* của repo:
+  - `CLOUDFLARE_API_TOKEN` – token vừa tạo
+  - `CLOUDFLARE_ACCOUNT_ID` – Account ID (trang *Workers & Pages*, cột bên phải)
+  - `TV_WEBHOOK_SECRET` – chuỗi bí mật tự đặt, điền giống hệt vào ô *Webhook secret* của chỉ báo
+- Tab *Actions → Deploy TradingView relay (Cloudflare) → Run workflow*. Trang *Summary* hiện **Webhook URL**
+  (`https://tv-relay.<subdomain>.workers.dev`). Ô `test_chat_id` (vd. kênh test) để gửi thử 1 lệnh + 1 reply.
+- TradingView: Settings chỉ báo → nhóm *Telegram* → tích **Webhook mode**, điền *Webhook secret* → tạo alert
+  *Any alert() function call*, Webhook URL = URL ở trên. Mỗi cặp coin một alert.
+- Token bot chỉ nằm trong Cloudflare (secret của Worker), không nằm trên TradingView.
+- Code chỉ báo không lưu trong repo (repo public).
+
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).
 - Script chỉ gọi `sendMessage` – **không** gọi `getUpdates` / `setWebhook`, nên nếu bạn

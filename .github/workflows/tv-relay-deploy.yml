@@ -1,0 +1,127 @@
+name: Deploy TradingView relay (Cloudflare)
+
+# Deploys tv-relay/ (TradingView webhook -> Telegram, TP/SL as replies to the
+# entry post) to Cloudflare Workers. The webhook URL for TradingView is shown
+# on the run's Summary page.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tv-relay/**"
+      - ".github/workflows/tv-relay-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      test_chat_id:
+        description: "Optional: send a test signal + TP1 reply to this chat (e.g. @your_test_channel)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      WEBHOOK_SECRET: ${{ secrets.TV_WEBHOOK_SECRET }}
+      WRANGLER: npx --yes wrangler@4.149.0
+    steps:
+      - name: Check secrets
+        id: check
+        run: |
+          missing=""
+          for s in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID TELEGRAM_BOT_TOKEN WEBHOOK_SECRET; do
+            [ -n "${!s}" ] || missing="$missing $s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Relay not deployed, missing secrets:$missing (WEBHOOK_SECRET = repo secret TV_WEBHOOK_SECRET)"
+            echo "### Relay not deployed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Missing repository secrets:$missing" >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: "22"
+
+      - name: workers.dev subdomain and KV namespace
+        if: steps.check.outputs.ready == 'true'
+        id: cf
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+
+          sub=$(curl -sS "${auth[@]}" "$api/workers/subdomain" | jq -r '.result.subdomain // empty')
+          if [ -z "$sub" ]; then
+            for name in valuealphacrypto "valuealpha-${CLOUDFLARE_ACCOUNT_ID:0:6}"; do
+              resp=$(curl -sS -X PUT "${auth[@]}" --data "{\"subdomain\":\"$name\"}" "$api/workers/subdomain")
+              if echo "$resp" | jq -e .success >/dev/null; then sub=$name; break; fi
+              echo "subdomain $name: $(echo "$resp" | jq -c .errors)"
+            done
+          fi
+          [ -n "$sub" ] || { echo "::error::Could not get a workers.dev subdomain"; exit 1; }
+
+          list=$(curl -sS "${auth[@]}" "$api/storage/kv/namespaces?per_page=100")
+          echo "$list" | jq -e .success >/dev/null || { echo "::error::KV list failed: $(echo "$list" | jq -c .errors)"; exit 1; }
+          kv=$(echo "$list" | jq -r '.result[] | select(.title == "tv-relay-trades") | .id' | head -n1)
+          if [ -z "$kv" ]; then
+            resp=$(curl -sS -X POST "${auth[@]}" --data '{"title":"tv-relay-trades"}' "$api/storage/kv/namespaces")
+            kv=$(echo "$resp" | jq -r '.result.id // empty')
+            [ -n "$kv" ] || { echo "::error::KV create failed: $(echo "$resp" | jq -c .errors)"; exit 1; }
+          fi
+          printf '\n[[kv_namespaces]]\nbinding = "TRADES"\nid = "%s"\n' "$kv" >> tv-relay/wrangler.toml
+          echo "url=https://tv-relay.$sub.workers.dev" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy worker and secrets
+        if: steps.check.outputs.ready == 'true'
+        working-directory: tv-relay
+        run: |
+          $WRANGLER deploy
+          jq -n --arg t "$TELEGRAM_BOT_TOKEN" --arg w "$WEBHOOK_SECRET" \
+            '{TELEGRAM_BOT_TOKEN: $t, WEBHOOK_SECRET: $w}' > "$RUNNER_TEMP/secrets.json"
+          $WRANGLER secret bulk "$RUNNER_TEMP/secrets.json"
+          rm -f "$RUNNER_TEMP/secrets.json"
+
+      - name: Health check
+        if: steps.check.outputs.ready == 'true'
+        env:
+          URL: ${{ steps.cf.outputs.url }}
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS "$URL" | grep -q "tv-relay ok"; then ok=1; break; fi
+            sleep 5
+          done
+          {
+            echo "### TradingView relay deployed"
+            echo "Webhook URL for TradingView alerts:"
+            echo '```'
+            echo "$URL"
+            echo '```'
+            [ -n "$ok" ] && echo "Health check: OK" || echo "Health check: not reachable yet (new workers.dev URLs can take a few minutes)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Test signal + reply
+        if: steps.check.outputs.ready == 'true' && inputs.test_chat_id != ''
+        env:
+          URL: ${{ steps.cf.outputs.url }}
+          CHAT: ${{ inputs.test_chat_id }}
+        run: |
+          id="TEST-$(date -u +%Y%m%d%H%M%S)"
+          send() {
+            jq -n --arg s "$WEBHOOK_SECRET" --arg c "$CHAT" --arg e "$1" --arg i "$id" --arg t "$2" \
+              '{secret: $s, chat_id: $c, event: $e, id: $i, text: $t}' |
+              curl -sS -X POST -H "Content-Type: application/json" --data @- "$URL"
+          }
+          r1=$(send entry $'🧪 TEST | LONG BTCUSDT.P\n━━━━━━━━━━━━━━\nEntry: 100000\nSL: 99000 (-1%)\nTP1: 100750 (+0.75%)\nTP2: 101200 (+1.2%)')
+          r2=$(send tp1 $'🧪 TEST | ✅ TP1 HIT | BTCUSDT.P\nTake 1/2 profit\nTP1: 100750')
+          { echo "### Test to $CHAT"; echo '```'; echo "$r1"; echo "$r2"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          echo "$r2" | jq -e '.reply_to != null' >/dev/null || { echo "::error::Test failed: $r1 / $r2"; exit 1; }
