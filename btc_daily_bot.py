@@ -343,8 +343,8 @@ def ltf_text(a, data):
 
 
 def setup_lines(st):
-    return [f"• Entry: {k_fmt(st['entry'])}", f"• SL: {k_fmt(st['sl'])}",
-            f"• TP1: {k_fmt(st['tp1'])}", f"• TP2: {k_fmt(st['tp2'])}"]
+    return [f"• Entry: {k_fmt(st['entry'])} | SL: {k_fmt(st['sl'])} | "
+            f"TP1: {k_fmt(st['tp1'])} | TP2: {k_fmt(st['tp2'])}"]
 
 
 def pick_altcoins(now):
