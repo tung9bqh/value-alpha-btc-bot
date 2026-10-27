@@ -365,7 +365,16 @@ def main():
     if args.wait_until:
         bot.wait_until(args.wait_until)
     now_utc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    events = todays_events(fetch_feed(), now_utc)
+    feed = fetch_feed()
+    events = todays_events(feed, now_utc)
+    if args.dry_run:  # show what the feed contains, to make quiet days easy to verify
+        dates = sorted(e["date"] for e in feed)
+        print(f"[feed: {len(feed)} events, {dates[0][:10] if dates else '-'} → {dates[-1][:10] if dates else '-'}]")
+        for e in feed:
+            if e.get("country") == "USD" and e.get("impact") == "High":
+                t = datetime.fromisoformat(e["date"]).astimezone(timezone.utc)
+                print(f"[USD high this week: {t:%a %d %b %H:%M} UTC  {e['title']}]")
+        print()
     if not events:
         print("No high-impact USD events in the next 24 hours - nothing to post.")
         return 0
