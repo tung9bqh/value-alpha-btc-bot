@@ -1,0 +1,19 @@
+[feed: 97 events, 2026-10-25 → 2026-10-30]
+[USD high this week: Wed 28 Oct 18:00 UTC  Federal Funds Rate]
+[USD high this week: Wed 28 Oct 18:00 UTC  FOMC Statement]
+[USD high this week: Wed 28 Oct 18:30 UTC  FOMC Press Conference]
+[USD high this week: Thu 29 Oct 12:30 UTC  Advance GDP q/q]
+[USD high this week: Thu 29 Oct 12:30 UTC  Core PCE Price Index m/m]
+
+🗓 <b>ECONOMIC CALENDAR — WED, OCT 28, 2026</b>
+🔴 High-impact USD news today:
+
+• <b>18:00 UTC</b> (01:00 UTC+7) — Federal Funds Rate
+   Forecast: 4.00% | Previous: 4.00%
+• <b>18:00 UTC</b> (01:00 UTC+7) — FOMC Statement
+• <b>18:30 UTC</b> (01:30 UTC+7) — FOMC Press Conference
+
+⚠️ Expect high volatility around the releases. Avoid over-leveraging, don't chase the first move and wait for confirmation.
+<i>Data: ForexFactory. Not financial advice.</i>
+
+[3 events; 414 chars; image saved to econ_calendar.png]
