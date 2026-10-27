@@ -337,8 +337,12 @@ def ltf_text(a, data):
     near = abs((a["primary"]["lo"] if short else a["primary"]["hi"]) - price) / price < 0.006
     tail = ""
     if near:
-        tail = (", but price is approaching a potential resistance area" if short
-                else ", and price is approaching a potential support area")
+        if short:
+            tail = (", but price is approaching a potential resistance area" if r > 50
+                    else ", with a potential resistance area just above")
+        else:
+            tail = (", but price is approaching a potential support area" if r < 50
+                    else ", with a potential support area just below")
     return (f"The short-term {'rebound' if rebound else 'pullback'} has pushed BTC toward {k_fmt(price, 100)}{where}. "
             f"RSI on M15 is at {r:.0f}, indicating {mom}{tail}.")
 
