@@ -25,7 +25,7 @@ Không cần API key. Trọng số quyết định LONG/SHORT: H4 40%, H1 30%, M
 Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_POOL` (danh sách coin để chọn ngẫu nhiên).
 
 ## Theo dõi plan & tổng kết (tự động)
-- **Cảnh báo** (workflow *Plan alerts*): kiểm tra nến M15 mỗi 30 phút từ 08:05–23:35 (mỗi giờ ban đêm) và
+- **Cảnh báo** (workflow *Plan alerts*): kiểm tra nến M15 **mỗi 10 phút** (cả ngày lẫn đêm) và
   **trả lời vào bài 8:30** khi: giá chạm Entry, TP1, TP2, SL, H1 đóng nến phá cấu trúc, hoặc giá chạy tới TP1
   trước khi vào vùng. Mỗi sự kiện chỉ báo 1 lần; tin cảnh báo ghi giờ xảy ra thực tế.
 - **Tổng kết hằng ngày**: 8:30 sáng hôm sau, ngay trước plan mới, bot đăng kết quả plan hôm qua.
@@ -46,7 +46,7 @@ Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOI
 1. **Thêm bot vào kênh tiếng Anh** với quyền Admin → *Post messages*.
 2. **Lấy chat ID của kênh**: kênh public dùng `@username` (vd. `@ValueAlphaCrypto`);
    kênh private dùng ID dạng `-100xxxxxxxxxx`.
-3. **Đưa thư mục này lên một GitHub repo** (nên để Private).
+3. **Đưa thư mục này lên một GitHub repo**.
 4. Repo → *Settings → Secrets and variables → Actions → New repository secret*:
    - `TELEGRAM_BOT_TOKEN` – token của bot (bắt buộc)
    - `TELEGRAM_CHAT_ID_EN` – không bắt buộc; mặc định đăng vào `@valuealphacrypto` (kênh tiếng Anh)
@@ -57,11 +57,11 @@ Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOI
 Từ đó trở đi, workflow tự chạy mỗi ngày.
 
 ## Ghi chú
-- Lịch GitHub thường chạy trễ vài phút, nên job khởi động lúc 08:20 và script tự **đợi đến đúng 08:30**
-  mới lấy dữ liệu và đăng. Nếu GitHub trễ quá 10 phút thì bài sẽ đăng ngay khi job chạy.
-- Repo để **Private** nên lịch không bị GitHub tự tắt (quy tắc tắt sau 60 ngày không hoạt động chỉ áp dụng
-  cho repo public). Ước tính dùng ~1.550 phút Actions/tháng (bài 8:30 ~11 phút/ngày + cảnh báo ~40 lượt/ngày),
-  nằm trong 2.000 phút miễn phí/tháng của repo private.
+- Lịch GitHub thường chạy trễ vài phút, nên job khởi động lúc 08:10 và script tự **đợi đến đúng 08:30**
+  mới lấy dữ liệu và đăng. Nếu GitHub trễ quá 20 phút thì bài sẽ đăng ngay khi job chạy.
+- Repo **public**: GitHub Actions miễn phí không giới hạn phút. Token bot nằm trong *Secrets* nên không bị lộ.
+- Với repo public, GitHub tự tắt lịch chạy nếu repo **không có hoạt động trong 60 ngày** (GitHub sẽ gửi email
+  báo trước). Nếu nhận email đó hoặc thấy bot ngừng đăng: vào tab *Actions*, chọn workflow và bấm *Enable*.
 - Đổi múi giờ: biến môi trường `POST_TZ_OFFSET_HOURS` (mặc định `7`). Đổi tên kênh: `CHANNEL_NAME`.
 - Đăng ngay một bài: tab *Actions → Post NOW to EN channel → Run workflow*
 - Chạy trên máy: `pip install matplotlib && python btc_daily_bot.py --dry-run` (ảnh lưu ở `btc_plan.png`)
