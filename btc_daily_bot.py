@@ -256,90 +256,60 @@ def join_words(items):
     return ", ".join(items[:-1]) + f", and {items[-1]}"
 
 
-def h4_text(a, data):
-    s, price, short = a["sig"]["H4"], a["price"], a["direction"] == "SHORT"
+def mtf_summary(a, data):
+    """One chained sentence across H4 -> H1 -> M30/M15, plus a one-line conclusion."""
+    sig, price, short = a["sig"], a["price"], a["direction"] == "SHORT"
+    h4, h1, m15 = sig["H4"], sig["H1"], sig["M15"]
+
+    # H4: swing structure + position versus its EMAs
     swings = pivots(data["H4"][-90:], 3, "h" if short else "l")[-4:]
-    parts = []
-    if len(swings) >= 2:
-        chain = " → ".join(k_fmt(v, 100) for v in swings)
-        trending = all((b < a_) if short else (b > a_) for a_, b in zip(swings, swings[1:]))
-        if trending:
-            parts.append(f"{'Lower highs' if short else 'Higher lows'} continue to form ({chain}).")
-        else:
-            parts.append(f"Recent swing {'highs' if short else 'lows'} ({chain}) show a mixed structure.")
-    above = [f"EMA{n}" for n in (20, 50, 200) if s[f"e{n}"][-1] is not None and price > s[f"e{n}"][-1]]
-    below = [f"EMA{n}" for n in (20, 50, 200) if s[f"e{n}"][-1] is not None and price <= s[f"e{n}"][-1]]
-    if not above:
-        pos = f"below {join_words(below)}"
-    elif not below:
-        pos = f"above {join_words(above)}"
+    emas = [h4[f"e{n}"][-1] for n in (20, 50, 200) if h4[f"e{n}"][-1] is not None]
+    if all(price < e for e in emas):
+        ema_pos = "below all key EMAs"
+    elif all(price > e for e in emas):
+        ema_pos = "above all key EMAs"
     else:
-        pos = f"above {join_words(above)} but below {join_words(below)}"
-    parts.append(f"BTC is trading around {k_fmt(price, 100)}, {pos}.")
-    slope = ("continues to slope downward" if s["e20_slope"] < -0.001 else
-             "continues to slope upward" if s["e20_slope"] > 0.001 else "is flattening")
-    control = ("sellers remain in control" if s["rsi"] < 45 else
-               "buyers remain in control" if s["rsi"] > 55 else "momentum is neutral")
-    parts.append(f"EMA20 {slope}, while RSI is at {s['rsi']:.0f} — {control}.")
-    return " ".join(parts)
-
-
-def h1_text(a, data):
-    s, price, short = a["sig"]["H1"], a["price"], a["direction"] == "SHORT"
-    last = data["H1"][-12:]
-    low, high = min(c["l"] for c in last), max(c["h"] for c in last)
-    rebounding = price - low > high - price
-    move = f"Price has rebounded from {k_fmt(low, 100)}" if rebounding else f"Price has pulled back from {k_fmt(high, 100)}"
-
-    def rel(v, name):
-        if abs(price - v) / price < 0.0015:
-            return f"is testing {name}"
-        return f"is trading {'above' if price > v else 'below'} {name}"
-    r50, r20 = rel(s["e50"][-1], "EMA50"), rel(s["e20"][-1], "EMA20")
-    if r50.replace("EMA50", "") == r20.replace("EMA20", "") and "testing" not in r50:
-        first = f"{move} and {r50.replace('EMA50', 'both EMA20 and EMA50')}."
+        ema_pos = "caught between its EMAs"
+    trending = len(swings) >= 2 and all((b < x) if short else (b > x) for x, b in zip(swings, swings[1:]))
+    if trending:
+        kind = "lower highs" if short else "higher lows"
+        h4_part = f"H4 keeps printing {kind} ({k_fmt(swings[0], 100)} → {k_fmt(swings[-1], 100)}) {ema_pos}"
     else:
-        first = f"{move} and {r50}, while {r20[3:]}."
-    mood = "bullish" if s["rsi"] > 60 else ("bearish" if s["rsi"] < 40 else "neutral")
-    rsi_part = f"RSI at {s['rsi']:.0f} is {mood}."
-    if s["e200"][-1] is None:
-        second = rsi_part
-    else:
-        second = ("EMA200 remains overhead, and " if price < s["e200"][-1] else
-                  "EMA200 sits below as support, and ") + rsi_part
-    if short and rebounding:
-        third = "This still looks like a corrective rebound within the broader downtrend."
-    elif not short and not rebounding:
-        third = "This still looks like a corrective pullback within the broader uptrend."
-    else:
-        third = f"H1 momentum is aligned with the higher-timeframe {'downtrend' if short else 'uptrend'}."
-    return " ".join([first, second, third])
+        h4_part = f"H4 structure is mixed with price {ema_pos}"
 
-
-def ltf_text(a, data):
-    s15, price, short = a["sig"]["M15"], a["price"], a["direction"] == "SHORT"
-    last = data["M15"][-16:]
-    rebound = price - min(c["l"] for c in last) > max(c["h"] for c in last) - price
-    e200 = s15["e200"][-1]
-    if e200 is None:
-        where = ""
-    elif abs(price - e200) / price < 0.0015:
-        where = ", testing M15 EMA200"
+    # H1: position versus EMA20/50
+    e20, e50 = h1["e20"][-1], h1["e50"][-1]
+    if min(abs(price - e20), abs(price - e50)) / price < 0.0015:
+        h1_part = "H1 is testing its EMA20/50"
+    elif price < min(e20, e50):
+        h1_part = "H1 is holding below EMA20/50"
+    elif price > max(e20, e50):
+        h1_part = "H1 is holding above EMA20/50"
     else:
-        where = f", {'above' if price > e200 else 'below'} M15 EMA200"
-    r = s15["rsi"]
-    mom = ("recovery momentum" if r > 55 else "selling pressure" if r < 45 else "balanced momentum")
-    near = abs((a["primary"]["lo"] if short else a["primary"]["hi"]) - price) / price < 0.006
-    tail = ""
-    if near:
-        if short:
-            tail = (", but price is approaching a potential resistance area" if r > 50
-                    else ", with a potential resistance area just above")
-        else:
-            tail = (", but price is approaching a potential support area" if r < 50
-                    else ", with a potential support area just below")
-    return (f"The short-term {'rebound' if rebound else 'pullback'} has pushed BTC toward {k_fmt(price, 100)}{where}. "
-            f"RSI on M15 is at {r:.0f}, indicating {mom}{tail}.")
+        h1_part = "H1 is trading between EMA20 and EMA50"
+
+    # M30/M15: momentum
+    r = m15["rsi"]
+    mood = "weak" if r < 45 else ("strong" if r > 55 else "neutral")
+    ltf_part = f"M30/M15 momentum is {mood} (RSI {r:.0f})"
+    chain = f"{h4_part}, {h1_part}, and {ltf_part}."
+
+    want = "Bearish" if short else "Bullish"
+    aligned = sum(sig[tf]["trend"] == want for tf in TIMEFRAMES)
+    lower_against = any(sig[tf]["trend"] not in (want, "Neutral") for tf in ("M30", "M15"))
+    if sig["H4"]["trend"] == want and aligned >= 3 and not lower_against and not trending:
+        conclusion = (f"Momentum favours the {'downside' if short else 'upside'} across timeframes, but the H4 "
+                      f"structure is not clean yet — {'sell rebounds' if short else 'buy dips'} only with tight risk.")
+    elif sig["H4"]["trend"] == want and aligned >= 3 and not lower_against:
+        conclusion = (f"Timeframes are aligned to the {'downside' if short else 'upside'} — "
+                      f"{'sell rebounds into resistance' if short else 'buy dips into support'} rather than chasing the move.")
+    elif sig["H4"]["trend"] == want:
+        conclusion = (f"The H4 {'downtrend' if short else 'uptrend'} is intact while lower timeframes are still "
+                      f"{'rebounding' if short else 'pulling back'} — wait for that move to stall at the zone "
+                      f"before {'shorting' if short else 'buying'}.")
+    else:
+        conclusion = ("Signals are mixed and the bias is weak — trade smaller and only on clear confirmation.")
+    return chain, conclusion
 
 
 def setup_lines(st):
@@ -367,6 +337,7 @@ def build_post(a, data, now):
     elif not short and g < p["lo"]:
         why += f", while holding above the recent {k_fmt(g, 100)} low"
     alts = join_words([f"${c}" for c in pick_altcoins(now)])
+    chain, conclusion = mtf_summary(a, data)
 
     lines = [
         f"{'📉' if short else '📈'} <b>BTCUSDT UPDATE — {now:%B %d, %Y}</b>".upper().replace("<B>", "<b>").replace("</B>", "</b>"),
@@ -374,12 +345,9 @@ def build_post(a, data, now):
         f"{'🔴' if short else '🟢'} <b>PRIMARY BIAS: {a['direction']}</b>",
         "",
         "🔎 <b>MULTI-TIMEFRAME ANALYSIS</b>",
+        html.escape(chain),
         "",
-        f"▪️ <b>H4:</b> {html.escape(h4_text(a, data))}",
-        "",
-        f"▪️ <b>H1:</b> {html.escape(h1_text(a, data))}",
-        "",
-        f"▪️ <b>M30 / M15:</b> {html.escape(ltf_text(a, data))}",
+        f"👉 <b>Conclusion:</b> {html.escape(conclusion)}",
         "",
         f"🎯 <b>KEY {a['direction']} ZONE</b>",
         "",

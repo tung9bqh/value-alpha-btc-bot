@@ -10,7 +10,7 @@ khung *Entry Conditions* (3 điều kiện) và cảnh báo *Don't FOMO*.
 
 **Bài viết (tiếng Anh)**:
 - `BTCUSDT UPDATE — <ngày>` và `PRIMARY BIAS: LONG/SHORT`
-- `MULTI-TIMEFRAME ANALYSIS`: nhận định H4, H1, M30/M15 (cấu trúc đỉnh/đáy, EMA20/50/200, RSI)
+- `MULTI-TIMEFRAME ANALYSIS`: 1 đoạn xâu chuỗi H4 → H1 → M30/M15 (cấu trúc đỉnh/đáy, EMA, RSI) + 1 dòng `Conclusion`
 - `KEY ZONE`: 1 kịch bản Primary (vùng hồi/điều chỉnh) với Entry (giữa vùng), **SL cố định 1.2%**,
   **TP1 = RR 1:1**, **TP2 = RR 1:1.5**
 - `Cancel Scenario`: khi nào huỷ kịch bản (H1 đóng nến phá cấu trúc, giá chạy tới TP1 trước khi vào vùng,
