@@ -36,6 +36,15 @@ Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOI
   Nếu một nến M15 chạm cả SL và TP, tính SL trước (thận trọng).
 - Lịch sử plan lưu ở nhánh `state` của repo (tự động, không cần chỉnh tay).
 
+## Lịch kinh tế 12:00 trưa (tự động)
+- Mỗi ngày lúc **12:00 (giờ Việt Nam)**, bot đọc lịch kinh tế của **ForexFactory** (feed xuất dữ liệu chính thức,
+  cùng dữ liệu với forexfactory.com/calendar), chỉ lấy tin **USD** có mức ảnh hưởng **High (màu đỏ)** trong 24 giờ tới.
+- Đăng ảnh *ECONOMIC CALENDAR TODAY* (giờ UTC, Forecast, Previous, tác động có thể có lên BTC, giải thích từng tin)
+  kèm caption ghi giờ UTC và UTC+7.
+- **Ngày không có tin đỏ thì không đăng gì.**
+- Chạy thử: tab *Actions → Economic Calendar (EN channel) → Run workflow* (để tích `dry_run`).
+- Font tiêu đề (Anton, Bebas Neue, Great Vibes) nằm trong `fonts/`, giấy phép SIL Open Font License.
+
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).
 - Script chỉ gọi `sendMessage` – **không** gọi `getUpdates` / `setWebhook`, nên nếu bạn

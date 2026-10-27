@@ -1,0 +1,60 @@
+name: Economic Calendar (EN channel)
+
+# Every day at 12:00 Vietnam time: high-impact (red) USD events from ForexFactory for
+# the next 24 hours, posted as an image + caption. Nothing is posted on quiet days.
+on:
+  schedule:
+    # 04:45 UTC = 11:45 Vietnam time; the script waits until exactly 12:00.
+    - cron: "45 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only preview the image + caption (do not send to Telegram)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write  # dry-run preview on the 'preview-econ' branch
+
+concurrency:
+  group: econ-calendar
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install chart library
+        run: pip install --quiet matplotlib
+      - name: Post economic calendar
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_EN || '@valuealphacrypto' }}
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python econ_calendar.py --dry-run | tee preview.txt
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            python econ_calendar.py --wait-until 12:00
+          else
+            python econ_calendar.py
+          fi
+      - name: Save preview to the 'preview-econ' branch
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/preview && cp preview.txt /tmp/preview/
+          [ -f econ_calendar.png ] && cp econ_calendar.png /tmp/preview/
+          cd /tmp/preview
+          git init -q -b preview-econ
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Preview $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}" preview-econ
