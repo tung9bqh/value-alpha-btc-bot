@@ -4,14 +4,21 @@ Tự động đăng **kế hoạch giao dịch BTC hằng ngày (tiếng Anh)** 
 *Value Alpha Crypto* lúc **08:30 sáng (giờ Việt Nam)**, chạy miễn phí bằng GitHub Actions.
 
 ## Nội dung mỗi bài
-- **Ảnh chart 4 khung M15 / M30 / H1 / H4** (nến, EMA20/50) có vẽ sẵn vùng Entry, SL, TP1, TP2
-- Xu hướng + RSI của từng khung
-- Đoạn nhận định tự động từ phân tích đa khung
-- Kết luận rõ ràng **TODAY: LONG hoặc SHORT** kèm độ tin cậy (High / Medium / Low)
-- Entry, SL, TP1/TP2 (kèm R:R), điều kiện vô hiệu, quản lý vốn, disclaimer
+**Ảnh plan khung M15**: header BTCUSDT + kịch bản ưu tiên (LONG/SHORT), ngày, khung M15,
+chart nến với EMA20/50/200, vùng chờ vào lệnh + mũi tên kịch bản, SL/TP1/TP2, giá hiện tại,
+khung *Entry Conditions* (3 điều kiện) và cảnh báo *Don't FOMO*.
+
+**Bài viết (tiếng Anh)**:
+- `BTCUSDT UPDATE — <ngày>` và `PRIMARY BIAS: LONG/SHORT`
+- `MULTI-TIMEFRAME ANALYSIS`: nhận định H4, H1, M30/M15 (cấu trúc đỉnh/đáy, EMA20/50/200, RSI)
+- `KEY ZONES`: Primary (vùng hồi/điều chỉnh) + Breakdown/Breakout (chờ H1 đóng nến phá vỡ rồi retest)
+- Mỗi setup có Entry (giữa vùng), **SL cố định 1.2%**, **TP1 = RR 1:1**, **TP2 = RR 1:1.5**
+- `ALTCOIN WATCHLIST` và disclaimer
 
 Dữ liệu: hợp đồng vĩnh cửu **BTCUSDT.P** trên **Bitget** (dự phòng: OKX `BTC-USDT-SWAP`).
-Không cần API key. Trọng số quyết định: H4 40%, H1 30%, M30 17%, M15 13%.
+Không cần API key. Trọng số quyết định LONG/SHORT: H4 40%, H1 30%, M30 17%, M15 13%.
+
+Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_WATCHLIST` (mặc định `ETH,SOL,SUI,AVAX,UNI`).
 
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).

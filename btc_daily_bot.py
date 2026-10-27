@@ -2,20 +2,21 @@
 """Value Alpha Crypto - BTC daily multi-timeframe plan poster (English channel).
 
 Pulls BTCUSDT.P (USDT-margined perpetual) candles for M15, M30, H1 and H4 from
-Bitget (fallback: OKX BTC-USDT-SWAP), decides the day's direction (LONG or
-SHORT), writes a short analysis, draws a 4-panel chart with the plan on it and
-posts chart + text to ONE Telegram channel: TELEGRAM_CHAT_ID.
+Bitget (fallback: OKX BTC-USDT-SWAP), decides the day's primary bias (LONG or
+SHORT), writes the multi-timeframe analysis with a primary and a
+breakdown/breakout setup (fixed % stop-loss, TP1/TP2 by R:R), draws an M15
+plan image and posts image + text to ONE Telegram channel: TELEGRAM_CHAT_ID.
 
 The script only calls Telegram's sendPhoto/sendMessage. It never calls
 getUpdates or setWebhook, so a bot that already serves another (e.g.
 Vietnamese) community with the same token keeps working untouched.
 
 Usage:
-    python btc_daily_bot.py --dry-run             # print post + save chart, send nothing
+    python btc_daily_bot.py --dry-run             # print post + save image, send nothing
     python btc_daily_bot.py                       # post to TELEGRAM_CHAT_ID
     python btc_daily_bot.py --wait-until 08:30    # sleep until 08:30 local time first
 
-Requires matplotlib (for the chart); everything else is standard library.
+Requires matplotlib (for the image); everything else is standard library.
 """
 
 import argparse
@@ -33,7 +34,10 @@ from datetime import datetime, timedelta, timezone
 
 TZ = timezone(timedelta(hours=int(os.environ.get("POST_TZ_OFFSET_HOURS", "7"))))  # Vietnam = UTC+7
 CHANNEL_NAME = os.environ.get("CHANNEL_NAME", "Value Alpha Crypto")
-USER_AGENT = "ValueAlphaBTCBot/2.0"
+ALTCOINS = [c.strip() for c in os.environ.get("ALTCOIN_WATCHLIST", "ETH,SOL,SUI,AVAX,UNI").split(",") if c.strip()]
+SL_PCT = float(os.environ.get("SL_PCT", "1.2"))  # stop-loss distance from entry, in %
+TP_RR = (1.0, 1.5)                                # TP1 / TP2 as reward-to-risk multiples
+USER_AGENT = "ValueAlphaBTCBot/3.0"
 
 # Display name -> (Bitget granularity, OKX bar, weight in the daily decision)
 TIMEFRAMES = {
@@ -62,7 +66,7 @@ def to_candles(rows):
 def fetch_bitget(granularity):
     url = ("https://api.bitget.com/api/v2/mix/market/candles?"
            + urllib.parse.urlencode({"symbol": "BTCUSDT", "productType": "USDT-FUTURES",
-                                     "granularity": granularity, "limit": 300}))
+                                     "granularity": granularity, "limit": 600}))
     body = http_get_json(url)
     if body.get("code") != "00000" or not body.get("data"):
         raise RuntimeError(f"bad response: {str(body)[:200]}")
@@ -131,11 +135,18 @@ def macd_hist(closes):
     return [m - s for m, s in zip(line[8:], signal[8:])]
 
 
+def pivots(candles, k=3, key="h"):
+    """Swing highs (key='h') or lows (key='l'): bars more extreme than k bars on each side."""
+    pick = max if key == "h" else min
+    return [candles[i][key] for i in range(k, len(candles) - k)
+            if candles[i][key] == pick(c[key] for c in candles[i - k:i + k + 1])]
+
+
 # ------------------------------------------------------------ analysis
 
 def analyze_tf(candles):
     closes = [c["c"] for c in candles]
-    e20, e50 = ema_series(closes, 20), ema_series(closes, 50)
+    e20, e50, e200 = ema_series(closes, 20), ema_series(closes, 50), ema_series(closes, 200)
     hist = macd_hist(closes)
     price = closes[-1]
     r = rsi(closes)
@@ -143,216 +154,404 @@ def analyze_tf(candles):
     score += 1 if r > 55 else (-1 if r < 45 else 0)
     score += 1 if hist[-1] > 0 else -1
     trend = "Bullish" if score >= 2 else ("Bearish" if score <= -2 else "Neutral")
-    if price > e20[-1] > e50[-1]:
-        stack = "above a bullish EMA20/50 stack"
-    elif price < e20[-1] < e50[-1]:
-        stack = "below a bearish EMA20/50 stack"
-    else:
-        stack = "between the EMA20 and EMA50"
-    return {"score": score, "trend": trend, "rsi": r, "e20": e20, "e50": e50,
-            "macd_rising": hist[-1] > hist[-2], "stack": stack, "atr": atr(candles)}
-
-
-def key_levels(data, sig):
-    h1, h4, m15 = data["H1"], data["H4"], data["M15"]
-    yday = (datetime.fromtimestamp(h1[-1]["t"], timezone.utc) - timedelta(days=1)).date()
-    prev_day = [c for c in h1 if datetime.fromtimestamp(c["t"], timezone.utc).date() == yday]
-    levels = [
-        ("H1 EMA20", sig["H1"]["e20"][-1]), ("H1 EMA50", sig["H1"]["e50"][-1]),
-        ("H4 EMA20", sig["H4"]["e20"][-1]), ("H4 EMA50", sig["H4"]["e50"][-1]),
-        ("24h high", max(c["h"] for c in h1[-24:])), ("24h low", min(c["l"] for c in h1[-24:])),
-        ("3D high", max(c["h"] for c in h4[-18:])), ("3D low", min(c["l"] for c in h4[-18:])),
-        ("M15 swing high", max(c["h"] for c in m15[-32:])), ("M15 swing low", min(c["l"] for c in m15[-32:])),
-    ]
-    if prev_day:
-        levels += [("PDH", max(c["h"] for c in prev_day)), ("PDL", min(c["l"] for c in prev_day))]
-    return levels
-
-
-def build_plan(direction, price, levels, atr1h, atr4h):
-    side = 1 if direction == "LONG" else -1
-    gap = 0.2 * atr1h
-    # Nearest level on the "entry" side of price (support for longs, resistance for shorts).
-    entry_side = sorted([lv for lv in levels if side * (price - lv[1]) > gap], key=lambda lv: side * (price - lv[1]))
-    target_side = sorted([lv for lv in levels if side * (lv[1] - price) > gap], key=lambda lv: side * (lv[1] - price))
-
-    if entry_side and side * (price - entry_side[0][1]) <= 1.5 * atr4h:
-        ref, edge = entry_side[0]
-        far = edge
-        near = edge + side * 0.3 * atr1h
-        if side * (near - price) > 0:  # zone reaches current price
-            near = price
-    else:
-        ref = "pullback"
-        near, far = price - side * 0.3 * atr1h, price - side * 0.8 * atr1h
-    sl = far - side * 0.6 * atr1h
-    mid = (near + far) / 2
-    risk = abs(mid - sl)
-
-    targets = [lv for lv in target_side if side * (lv[1] - mid) >= 1.0 * risk]
-    tp1 = targets[0][1] if targets else mid + side * 1.5 * risk
-    more = [lv[1] for lv in targets if side * (lv[1] - tp1) >= 0.5 * risk]
-    tp2 = more[0] if more else tp1 + side * max(risk, side * (mid + side * 2.5 * risk - tp1))
-    lo, hi = sorted((near, far))
-    return {"direction": direction, "entry_lo": lo, "entry_hi": hi, "entry_ref": ref, "sl": sl,
-            "tp1": tp1, "tp2": tp2, "rr1": abs(tp1 - mid) / risk, "rr2": abs(tp2 - mid) / risk}
+    return {"score": score, "trend": trend, "rsi": r, "e20": e20, "e50": e50, "e200": e200,
+            "atr": atr(candles), "e20_slope": (e20[-1] - e20[-4]) / price}
 
 
 def analyze(data):
     sig = {tf: analyze_tf(c) for tf, c in data.items()}
     price = data["M15"][-1]["c"]
-    h1 = data["H1"]
-    change_24h = (price / h1[-25]["c"] - 1) * 100 if len(h1) > 25 else 0.0
-
     total = sum(TIMEFRAMES[tf][2] * sig[tf]["score"] / 4 for tf in TIMEFRAMES)  # -1 .. +1
     if total == 0:
         total = 0.01 if price > sig["H4"]["e50"][-1] else -0.01
     direction = "LONG" if total > 0 else "SHORT"
-    confidence = "High" if abs(total) >= 0.6 else ("Medium" if abs(total) >= 0.3 else "Low")
+    a = {"price": price, "sig": sig, "total": total, "direction": direction,
+         "confidence": "High" if abs(total) >= 0.6 else ("Medium" if abs(total) >= 0.3 else "Low")}
+    a["primary"], a["secondary"] = build_zones(data, sig, price, direction)
+    return a
 
-    plan = build_plan(direction, price, key_levels(data, sig), sig["H1"]["atr"], sig["H4"]["atr"])
-    return {"price": price, "change_24h": change_24h, "sig": sig, "total": total,
-            "direction": direction, "confidence": confidence, "plan": plan}
+
+def candidate_levels(data, sig):
+    h1, m15 = data["H1"], data["M15"]
+    yday = (datetime.fromtimestamp(h1[-1]["t"], TZ) - timedelta(days=1)).date()
+    prev_day = [c for c in h1 if datetime.fromtimestamp(c["t"], TZ).date() == yday]
+    levels = []
+    for tf in ("H4", "H1", "M15"):
+        for n in (20, 50, 200):
+            v = sig[tf][f"e{n}"][-1]
+            if v is not None:
+                levels.append((f"{tf} EMA{n}", v))
+    levels += [(f"the {k_fmt(v, 100)} swing high", v) for v in pivots(h1[-72:], 3, "h")[-4:]]
+    levels += [(f"the {k_fmt(v, 100)} swing low", v) for v in pivots(h1[-72:], 3, "l")[-4:]]
+    levels += [(f"the {k_fmt(v, 100)} M15 swing high", v) for v in pivots(m15[-96:], 4, "h")[-3:]]
+    levels += [(f"the {k_fmt(v, 100)} M15 swing low", v) for v in pivots(m15[-96:], 4, "l")[-3:]]
+    if prev_day:
+        levels += [("yesterday's high", max(c["h"] for c in prev_day)),
+                   ("yesterday's low", min(c["l"] for c in prev_day))]
+    return levels
 
 
-def commentary(a):
-    sig, long_ = a["sig"], a["direction"] == "LONG"
-    h4, h1 = sig["H4"], sig["H1"]
-    trend_word = {"Bullish": "bullish", "Bearish": "bearish", "Neutral": "undecided"}
-    stack_agrees = ("bullish" in h4["stack"] and h4["trend"] == "Bullish") or \
-                   ("bearish" in h4["stack"] and h4["trend"] == "Bearish")
-    if stack_agrees or "between" in h4["stack"]:
-        parts = [f"On H4, BTC trades {h4['stack']} with RSI {h4['rsi']:.0f}, "
-                 f"so the higher-timeframe trend is {trend_word[h4['trend']]}."]
+def make_setup(direction, lo, hi):
+    side = 1 if direction == "LONG" else -1
+    entry = (lo + hi) / 2
+    risk = entry * SL_PCT / 100
+    return {"direction": direction, "lo": lo, "hi": hi, "entry": entry, "sl": entry - side * risk,
+            "tp1": entry + side * TP_RR[0] * risk, "tp2": entry + side * TP_RR[1] * risk}
+
+
+def build_zones(data, sig, price, direction):
+    """Primary setup (retrace into confluence) and secondary setup (breakdown/breakout retest)."""
+    side = 1 if direction == "LONG" else -1
+    width = round_to(price * 0.0035, 50) or 50
+    levels = candidate_levels(data, sig)
+
+    # Primary: nearest level on the pullback side (resistance for shorts, support for longs).
+    pullback_side = sorted([lv for lv in levels if 0.001 < side * (price - lv[1]) / price < 0.02],
+                           key=lambda lv: side * (price - lv[1]))
+    if pullback_side:
+        center = pullback_side[0][1]
+        lo, hi = round_to(center - width / 2, 50), round_to(center + width / 2, 50)
+        # keep the zone fully on the pullback side of price
+        if side == -1 and lo <= price:
+            lo, hi = round_to(price * 1.001, 50) + 50, round_to(price * 1.001, 50) + 50 + width
+        if side == 1 and hi >= price:
+            hi, lo = round_to(price * 0.999, 50) - 50, round_to(price * 0.999, 50) - 50 - width
+        reasons = [name for name, v in levels if lo - width * 0.5 <= v <= hi + width * 0.5]
     else:
-        parts = [f"On H4, BTC trades {h4['stack']}, but RSI {h4['rsi']:.0f} and MACD don't confirm, "
-                 f"leaving the higher-timeframe trend {trend_word[h4['trend']]}."]
+        base = price * (1 - side * 0.003)
+        lo, hi = sorted((round_to(base, 50), round_to(base - side * width, 50)))
+        reasons = []
+    primary = make_setup(direction, lo, hi)
+    recent = data["H1"][-24:]
+    primary["reasons"] = list(dict.fromkeys(reasons))[:3]
+    primary["guard"] = (max(c["h"] for c in recent) if side == -1 else min(c["l"] for c in recent))
 
-    if h1["trend"] == h4["trend"] and h1["trend"] != "Neutral":
-        parts.append(f"H1 confirms it, with MACD momentum {'building' if h1['macd_rising'] == (h1['trend'] == 'Bullish') else 'cooling'}.")
+    # Secondary: H1 close through the nearest support (short) / resistance (long), then retest.
+    swings = pivots(data["H1"][-72:], 3, "l" if side == -1 else "h")
+    beyond = [v for v in swings if side * (v - price) / price > 0.003]
+    if beyond:
+        trigger = max(beyond) if side == -1 else min(beyond)
     else:
-        parts.append(f"H1 reads {trend_word[h1['trend']]} (RSI {h1['rsi']:.0f}), "
-                     f"so the intraday picture is {'mixed' if h1['trend'] == 'Neutral' else 'diverging from H4'}.")
-
-    want = "Bullish" if long_ else "Bearish"
-    ltf = [sig["M30"]["trend"], sig["M15"]["trend"]]
-    if all(t == want for t in ltf):
-        parts.append("M30/M15 are aligned, so " + ("dips should be bought quickly." if long_ else "bounces should be sold quickly."))
-    elif all(t not in (want, "Neutral") for t in ltf):
-        parts.append("M30/M15 are still " + ("pulling back" if long_ else "bouncing")
-                     + ", so wait for price to reach the entry zone instead of chasing.")
-    else:
-        parts.append("M30/M15 are mixed, so patience at the entry zone is key.")
-    if a["confidence"] == "Low":
-        parts.append("Signals are weak today: trade smaller.")
-    return " ".join(parts)
+        trigger = min(c["l"] for c in recent) if side == -1 else max(c["h"] for c in recent)
+        if side * (trigger - price) / price <= 0.003:
+            trigger = price * (1 + side * 0.006)
+    trigger = round_to(trigger, 50)
+    retest = round_to(width * 0.8, 50) or 50
+    lo2, hi2 = (trigger, trigger + retest) if side == -1 else (trigger - retest, trigger)
+    secondary = make_setup(direction, lo2, hi2)
+    secondary["trigger"] = trigger
+    return primary, secondary
 
 
 # -------------------------------------------------------------- format
 
-def usd(x, step=10):
-    return f"{round(x / step) * step:,.0f}"
+def round_to(x, step):
+    return round(x / step) * step
 
 
-def build_post(a, source, now):
-    p, sig = a["plan"], a["sig"]
-    dot = {"Bullish": "🟢", "Bearish": "🔴", "Neutral": "🟡"}
-    arrow = "▲" if a["change_24h"] >= 0 else "▼"
-    long_ = a["direction"] == "LONG"
-    tf_lines = [f"{dot[sig[tf]['trend']]} {tf:<3} {sig[tf]['trend']} · RSI {sig[tf]['rsi']:.0f}" for tf in TIMEFRAMES]
-    offset = now.utcoffset().total_seconds() / 3600
-    return "\n".join([
-        f"📊 <b>{html.escape(CHANNEL_NAME)} | BTC Daily Plan</b>",
-        f"📅 {now:%a, %b %d, %Y} • {now:%H:%M} (UTC{offset:+g})",
-        f"💰 <b>BTCUSDT.P:</b> ${usd(a['price'], 1)} ({arrow} {a['change_24h']:+.2f}% 24h)",
+def k_fmt(x, step=10):
+    """82000 -> '82K', 80450 -> '80.45K', 80800 -> '80.8K'."""
+    v = round_to(x, step) / 1000
+    return f"{v:,.2f}".rstrip("0").rstrip(".") + "K"
+
+
+def join_words(items):
+    if len(items) <= 2:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def h4_text(a, data):
+    s, price, short = a["sig"]["H4"], a["price"], a["direction"] == "SHORT"
+    swings = pivots(data["H4"][-90:], 3, "h" if short else "l")[-4:]
+    parts = []
+    if len(swings) >= 2:
+        chain = " → ".join(k_fmt(v, 100) for v in swings)
+        trending = all((b < a_) if short else (b > a_) for a_, b in zip(swings, swings[1:]))
+        if trending:
+            parts.append(f"{'Lower highs' if short else 'Higher lows'} continue to form ({chain}).")
+        else:
+            parts.append(f"Recent swing {'highs' if short else 'lows'} ({chain}) show a mixed structure.")
+    above = [f"EMA{n}" for n in (20, 50, 200) if s[f"e{n}"][-1] is not None and price > s[f"e{n}"][-1]]
+    below = [f"EMA{n}" for n in (20, 50, 200) if s[f"e{n}"][-1] is not None and price <= s[f"e{n}"][-1]]
+    if not above:
+        pos = f"below {join_words(below)}"
+    elif not below:
+        pos = f"above {join_words(above)}"
+    else:
+        pos = f"above {join_words(above)} but below {join_words(below)}"
+    parts.append(f"BTC is trading around {k_fmt(price, 100)}, {pos}.")
+    slope = ("continues to slope downward" if s["e20_slope"] < -0.001 else
+             "continues to slope upward" if s["e20_slope"] > 0.001 else "is flattening")
+    control = ("sellers remain in control" if s["rsi"] < 45 else
+               "buyers remain in control" if s["rsi"] > 55 else "momentum is neutral")
+    parts.append(f"EMA20 {slope}, while RSI is at {s['rsi']:.0f} — {control}.")
+    return " ".join(parts)
+
+
+def h1_text(a, data):
+    s, price, short = a["sig"]["H1"], a["price"], a["direction"] == "SHORT"
+    last = data["H1"][-12:]
+    low, high = min(c["l"] for c in last), max(c["h"] for c in last)
+    rebounding = price - low > high - price
+    move = f"Price has rebounded from {k_fmt(low, 100)}" if rebounding else f"Price has pulled back from {k_fmt(high, 100)}"
+
+    def rel(v, name):
+        if abs(price - v) / price < 0.0015:
+            return f"is testing {name}"
+        return f"is trading {'above' if price > v else 'below'} {name}"
+    r50, r20 = rel(s["e50"][-1], "EMA50"), rel(s["e20"][-1], "EMA20")
+    if r50.replace("EMA50", "") == r20.replace("EMA20", "") and "testing" not in r50:
+        first = f"{move} and {r50.replace('EMA50', 'both EMA20 and EMA50')}."
+    else:
+        first = f"{move} and {r50}, while {r20[3:]}."
+    mood = "bullish" if s["rsi"] > 60 else ("bearish" if s["rsi"] < 40 else "neutral")
+    rsi_part = f"RSI at {s['rsi']:.0f} is {mood}."
+    if s["e200"][-1] is None:
+        second = rsi_part
+    else:
+        second = ("EMA200 remains overhead, and " if price < s["e200"][-1] else
+                  "EMA200 sits below as support, and ") + rsi_part
+    if short and rebounding:
+        third = "This still looks like a corrective rebound within the broader downtrend."
+    elif not short and not rebounding:
+        third = "This still looks like a corrective pullback within the broader uptrend."
+    else:
+        third = f"H1 momentum is aligned with the higher-timeframe {'downtrend' if short else 'uptrend'}."
+    return " ".join([first, second, third])
+
+
+def ltf_text(a, data):
+    s15, price, short = a["sig"]["M15"], a["price"], a["direction"] == "SHORT"
+    last = data["M15"][-16:]
+    rebound = price - min(c["l"] for c in last) > max(c["h"] for c in last) - price
+    e200 = s15["e200"][-1]
+    if e200 is None:
+        where = ""
+    elif abs(price - e200) / price < 0.0015:
+        where = ", testing M15 EMA200"
+    else:
+        where = f", {'above' if price > e200 else 'below'} M15 EMA200"
+    r = s15["rsi"]
+    mom = ("recovery momentum" if r > 55 else "selling pressure" if r < 45 else "balanced momentum")
+    near = abs((a["primary"]["lo"] if short else a["primary"]["hi"]) - price) / price < 0.006
+    tail = ""
+    if near:
+        tail = (", but price is approaching a potential resistance area" if short
+                else ", and price is approaching a potential support area")
+    return (f"The short-term {'rebound' if rebound else 'pullback'} has pushed BTC toward {k_fmt(price, 100)}{where}. "
+            f"RSI on M15 is at {r:.0f}, indicating {mom}{tail}.")
+
+
+def setup_lines(st):
+    return [f"• Entry: {k_fmt(st['entry'])} | SL: {k_fmt(st['sl'])} ({SL_PCT:g}%)",
+            f"• TP1: {k_fmt(st['tp1'])} (RR 1:{TP_RR[0]:g}) | TP2: {k_fmt(st['tp2'])} (RR 1:{TP_RR[1]:g})"]
+
+
+def build_post(a, data, now):
+    short = a["direction"] == "SHORT"
+    p, s2 = a["primary"], a["secondary"]
+    word = "Short" if short else "Long"
+    zone = f"{k_fmt(p['lo'], 50)}–{k_fmt(p['hi'], 50)}"
+    if p["reasons"]:
+        why = f"This area aligns with {join_words(p['reasons'])}"
+    else:
+        why = "This area marks the nearest " + ("rebound" if short else "pullback") + " zone from current price"
+    g = p["guard"]
+    if short and g > p["hi"]:
+        why += f", while remaining below the recent {k_fmt(g, 100)} high"
+    elif not short and g < p["lo"]:
+        why += f", while holding above the recent {k_fmt(g, 100)} low"
+    trig = k_fmt(s2["trigger"], 50)
+    alts = join_words([f"${c}" for c in ALTCOINS])
+
+    lines = [
+        f"{'📉' if short else '📈'} <b>BTCUSDT UPDATE — {now:%B %d, %Y}</b>".upper().replace("<B>", "<b>").replace("</B>", "</b>"),
         "",
-        "<b>🔎 Multi-timeframe</b>",
-        *tf_lines,
+        f"{'🔴' if short else '🟢'} <b>PRIMARY BIAS: {a['direction']}</b>",
         "",
-        "<b>🧠 Analysis</b>",
-        html.escape(commentary(a)),
+        "🔎 <b>MULTI-TIMEFRAME ANALYSIS</b>",
         "",
-        f"<b>🎯 TODAY: {a['direction']} {'🟢' if long_ else '🔴'}</b> (confidence: {a['confidence']})",
-        f"• Entry: {usd(p['entry_lo'])} – {usd(p['entry_hi'])}",
-        f"• SL: {usd(p['sl'])}",
-        f"• TP1: {usd(p['tp1'])} ({p['rr1']:.1f}R) | TP2: {usd(p['tp2'])} ({p['rr2']:.1f}R)",
-        f"• Invalid if H1 closes {'below' if long_ else 'above'} {usd(p['sl'])}",
+        f"▪️ <b>H4:</b> {html.escape(h4_text(a, data))}",
         "",
-        "🛡 Risk 1–2%/trade · Move SL to entry at TP1",
-        f"<i>Data: {source} BTCUSDT.P. Not financial advice. DYOR.</i>",
-    ])
+        f"▪️ <b>H1:</b> {html.escape(h1_text(a, data))}",
+        "",
+        f"▪️ <b>M30 / M15:</b> {html.escape(ltf_text(a, data))}",
+        "",
+        f"🎯 <b>KEY {a['direction']} ZONES</b>",
+        "",
+        f"{'🔴' if short else '🟢'} <b>Primary {word}: {zone}</b>",
+        f"Wait for price to {'rebound' if short else 'pull back'} into this zone and show "
+        f"{'bearish' if short else 'bullish'} rejection. {html.escape(why)}.",
+        *setup_lines(p),
+        "",
+        f"{'🔻 <b>Breakdown' if short else '🔺 <b>Breakout'} {word}: {k_fmt(s2['lo'], 50)}–{k_fmt(s2['hi'], 50)}</b>",
+        f"Only consider this setup if an H1 candle closes {'below' if short else 'above'} {trig}. "
+        f"Then wait for price to retest the broken {'support' if short else 'resistance'} zone before considering a "
+        f"{word.lower()} entry. Do not chase the price during a sharp {'sell-off' if short else 'rally'}.",
+        *setup_lines(s2),
+        "",
+        "📊 <b>ALTCOIN WATCHLIST</b>",
+        f"Keep an eye on {alts}. Combine our trading indicators with technical analysis and wait for "
+        "confirmation before entering any trade.",
+        "",
+        "⚠️ <i>This analysis is for reference only, not financial advice. Always manage your risk and "
+        "trade according to your plan.</i>",
+    ]
+    return "\n".join(lines)
 
 
 def visible_len(text):
     return len(html.unescape(re.sub(r"<[^>]+>", "", text)))
 
 
-# --------------------------------------------------------------- chart
+# --------------------------------------------------------------- image
 
-def draw_chart(data, a, source, now, path):
+def draw_plan_image(data, a, now, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    import matplotlib.ticker  # noqa: F401 - used via matplotlib.ticker below
+    import matplotlib.ticker  # noqa: F401 - used as matplotlib.ticker below
+    from matplotlib.patches import Ellipse, FancyBboxPatch
+    from matplotlib.transforms import blended_transform_factory
 
-    bg, panel, grid, fg = "#0b0e11", "#12161c", "#1f2630", "#c9d1d9"
-    up, down = "#2ebd85", "#f6465d"
-    p = a["plan"]
-    long_ = a["direction"] == "LONG"
-    bars = {"H4": 42, "H1": 72, "M30": 80, "M15": 96}
+    bg, fg, muted, grid = "#07090d", "#f5f5f5", "#9aa4b2", "#161b22"
+    gold, up, down, cyan = "#f0b429", "#22c55e", "#ff3b4e", "#22d3ee"
+    short = a["direction"] == "SHORT"
+    accent = down if short else up
+    p = a["primary"]
 
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10), dpi=100, facecolor=bg)
-    for ax, tf in zip(axes.flat, TIMEFRAMES):
-        candles = data[tf][-bars[tf]:]
-        n = len(candles)
-        sig = a["sig"][tf]
-        ax.set_facecolor(panel)
-        for i, c in enumerate(candles):
-            col = up if c["c"] >= c["o"] else down
-            ax.vlines(i, c["l"], c["h"], color=col, linewidth=1)
-            ax.bar(i, max(abs(c["c"] - c["o"]), 1e-6), bottom=min(c["o"], c["c"]), color=col, width=0.65)
-        xs = range(n)
-        ax.plot(xs, sig["e20"][-n:], color="#f0b90b", linewidth=1.2, label="EMA20")
-        ax.plot(xs, sig["e50"][-n:], color="#3d8bfd", linewidth=1.2, label="EMA50")
+    fig = plt.figure(figsize=(16, 9), dpi=100, facecolor=bg)
+    ov = fig.add_axes([0, 0, 1, 1])
+    ov.set_xlim(0, 1)
+    ov.set_ylim(0, 1)
+    ov.axis("off")
+    ov.set_zorder(2)
+    ov.patch.set_alpha(0)
 
-        ax.axhspan(p["entry_lo"], p["entry_hi"], color="#3d8bfd", alpha=0.18)
-        lines = [("ENTRY", (p["entry_lo"] + p["entry_hi"]) / 2, "#3d8bfd"), ("SL", p["sl"], down),
-                 ("TP1", p["tp1"], up), ("TP2", p["tp2"], up)]
-        ys = [c["l"] for c in candles] + [c["h"] for c in candles] + [y for _, y, _ in lines]
-        pad = (max(ys) - min(ys)) * 0.05
-        ymin, ymax = min(ys) - pad, max(ys) + pad
-        ax.set_ylim(ymin, ymax)
+    def box(x, y, w, h, edge, face="#0d1117", lw=2, r=0.012):
+        ov.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad=0,rounding_size={r}",
+                                    linewidth=lw, edgecolor=edge, facecolor=face, mutation_aspect=16 / 9))
 
-        # Spread the labels so they never overlap, even when the levels are close.
-        min_gap = (ymax - ymin) * 0.045
-        placed = []
-        for name, y, col in sorted(lines, key=lambda x: x[1]):
-            ty = max(y, placed[-1] + min_gap) if placed else y
-            placed.append(ty)
-            ax.axhline(y, color=col, linestyle="--", linewidth=1)
-            ax.text(n + 0.5, ty, f" {name} {usd(y)}", color=col, va="center", fontsize=9, fontweight="bold")
-        ax.set_xlim(-1, n + max(12, int(n * 0.24)))  # room for the level labels
-        ticks = list(range(0, n, max(1, n // 6)))
-        fmt = "%d/%m" if tf == "H4" else "%H:%M"
-        ax.set_xticks(ticks)
-        ax.set_xticklabels([datetime.fromtimestamp(candles[i]["t"], TZ).strftime(fmt) for i in ticks])
-        tcol = {"Bullish": up, "Bearish": down, "Neutral": "#f0b90b"}[sig["trend"]]
-        ax.set_title(f"{tf}  •  {sig['trend']}  •  RSI {sig['rsi']:.0f}", color=tcol, loc="left",
-                     fontsize=12, fontweight="bold")
-        ax.tick_params(colors=fg, labelsize=8)
-        ax.yaxis.tick_right()
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
-        ax.grid(color=grid, linewidth=0.6)
-        for s in ax.spines.values():
-            s.set_color(grid)
-        ax.legend(loc="best", fontsize=8, facecolor=panel, edgecolor=grid, labelcolor=fg, framealpha=0.85)
-        ax.text(0.5, 0.5, CHANNEL_NAME, transform=ax.transAxes, ha="center", va="center",
-                fontsize=26, color=fg, alpha=0.06, fontweight="bold")
+    # ---- header
+    ov.add_patch(Ellipse((0.048, 0.915), 0.066, 0.066 * 16 / 9, color="#f7931a"))
+    ov.text(0.048, 0.912, "B", color="white", fontsize=40, fontweight="bold", ha="center", va="center")
+    for dx in (-0.006, 0.004):
+        ov.plot([0.048 + dx, 0.048 + dx], [0.955, 0.968], color="white", lw=3, solid_capstyle="butt")
+        ov.plot([0.048 + dx, 0.048 + dx], [0.856, 0.869], color="white", lw=3, solid_capstyle="butt")
+    ov.text(0.094, 0.918, "BTCUSDT", color=fg, fontsize=50, fontweight="bold", va="center")
+    ov.plot([0.345, 0.345], [0.875, 0.96], color="#5b6270", lw=1.5)
+    box(0.36, 0.868, 0.50, 0.10, accent, face="#1a0b0e" if short else "#0b1a10")
+    ov.text(0.385, 0.918, "PRIMARY SCENARIO:", color=fg, fontsize=30, fontweight="bold", va="center")
+    ov.text(0.71, 0.918, a["direction"], color=accent, fontsize=36, fontweight="bold", va="center")
+    box(0.094, 0.79, 0.13, 0.055, gold, face=bg, lw=1.6, r=0.008)
+    ov.text(0.159, 0.817, f"{now:%d/%m/%Y}", color=fg, fontsize=17, fontweight="bold", ha="center", va="center")
+    box(0.237, 0.79, 0.055, 0.055, gold, face=bg, lw=1.6, r=0.008)
+    ov.text(0.2645, 0.817, "M15", color=gold, fontsize=17, fontweight="bold", ha="center", va="center")
 
-    fig.suptitle(f"BTCUSDT.P ({source})  •  {now:%d %b %Y %H:%M} (UTC{now.utcoffset().total_seconds() / 3600:+g})"
-                 f"   |   TODAY: {a['direction']}  ({a['confidence']} confidence)",
-                 color=up if long_ else down, fontsize=16, fontweight="bold")
-    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    # ---- M15 chart
+    candles = data["M15"][-260:]
+    n = len(candles)
+    sig = a["sig"]["M15"]
+    ax = fig.add_axes([0.012, 0.06, 0.60, 0.70], facecolor=bg)
+    for i, c in enumerate(candles):
+        col = up if c["c"] >= c["o"] else down
+        ax.vlines(i, c["l"], c["h"], color=col, linewidth=0.8)
+        ax.bar(i, max(abs(c["c"] - c["o"]), 1e-6), bottom=min(c["o"], c["c"]), color=col, width=0.7)
+    for key, col in (("e20", "#facc15"), ("e50", "#3b82f6"), ("e200", "#a855f7")):
+        ys = sig[key][-n:]
+        pts = [(i, y) for i, y in enumerate(ys) if y is not None]
+        if pts:
+            ax.plot(*zip(*pts), color=col, linewidth=1.3)
+
+    price = a["price"]
+    zone_mid = (p["lo"] + p["hi"]) / 2
+    levels = [p["sl"], p["tp1"], p["tp2"], p["lo"], p["hi"]]
+    ys = [c["l"] for c in candles] + [c["h"] for c in candles] + levels
+    span = max(ys) - min(ys)
+    ymin, ymax = min(ys) - span * 0.06, max(ys) + span * 0.14
+    xmax = n + 34
+    ax.set_xlim(-2, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # plan zone + SL/TP
+    zx0 = n - 70
+    ax.fill_between([zx0, xmax], p["lo"], p["hi"], color=accent, alpha=0.32, linewidth=0)
+    ax.hlines([p["lo"], p["hi"]], zx0, xmax, color=accent, linewidth=1, alpha=0.8)
+    for name, y, col in (("SL", p["sl"], down), ("TP1", p["tp1"], up), ("TP2", p["tp2"], up)):
+        ax.hlines(y, n - 62, xmax, color=col, linestyle=(0, (5, 4)), linewidth=1)
+        ax.text(n - 62, y + span * 0.008, f"{name} {k_fmt(y)}", color=col, fontsize=10, fontweight="bold",
+                va="bottom")
+
+    # scenario arrow: retrace into the zone, then continue in the bias direction
+    x0, x1, x2 = n + 1, n + 9, n + 21
+    y_end = zone_mid - (zone_mid - price) * 2.0
+    y_end = max(y_end, ymin + span * 0.05) if short else min(y_end, ymax - span * 0.05)
+    ax.plot([x0, x1], [price, zone_mid], color=accent, linewidth=3, solid_capstyle="round")
+    ax.annotate("", xy=(x2, y_end), xytext=(x1, zone_mid),
+                arrowprops=dict(arrowstyle="-|>,head_width=0.6,head_length=1.0", color=accent, linewidth=3))
+
+    # callout
+    cy = p["hi"] + span * 0.16 if short else p["lo"] - span * 0.16
+    cy = min(max(cy, ymin + span * 0.1), ymax - span * 0.08)
+    ax.text(n + 6, cy, f"{a['direction']} ZONE:\n{k_fmt(p['lo'], 50)} – {k_fmt(p['hi'], 50)}",
+            color=fg, fontsize=15, fontweight="bold", ha="center", va="center", linespacing=1.4,
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="#1a0b0e" if short else "#0b1a10",
+                      edgecolor=accent, linewidth=2))
+
+    # current price
+    ax.axhline(price, color=cyan, linestyle=(0, (2, 2)), linewidth=1)
+    tr = blended_transform_factory(ax.transAxes, ax.transData)
+    ax.text(1.012, price, f"Current price\n~{k_fmt(price, 100)}", transform=tr, color="#001018", fontsize=11,
+            fontweight="bold", ha="left", va="center", linespacing=1.2,
+            bbox=dict(boxstyle="round,pad=0.35", facecolor=cyan, edgecolor=cyan))
+
+    ax.yaxis.tick_right()
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax.tick_params(colors=muted, labelsize=11, length=0)
+    ticks, labels = [], []
+    for i, c in enumerate(candles):
+        t = datetime.fromtimestamp(c["t"], TZ)
+        if t.minute == 0 and t.hour in (0, 12):
+            ticks.append(i)
+            labels.append(f"{t:%d}" if t.hour == 0 else "12:00")
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(labels)
+    ax.grid(color=grid, linewidth=0.6)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+    ax.text(0.5, 0.5, CHANNEL_NAME, transform=ax.transAxes, ha="center", va="center", fontsize=40,
+            color=fg, alpha=0.05, fontweight="bold")
+
+    # ---- right panel: entry conditions
+    box(0.705, 0.30, 0.282, 0.555, gold, face="#0d0f14")
+    ov.text(0.728, 0.80, "◎", color=gold, fontsize=30, va="center", ha="center")
+    ov.text(0.75, 0.80, "ENTRY CONDITIONS", color=gold, fontsize=22, fontweight="bold", va="center")
+    zone_txt = f"{k_fmt(p['lo'], 50)} – {k_fmt(p['hi'], 50)}"
+    items = [
+        (f"Price {'rebounds' if short else 'pulls back'} into", zone_txt),
+        (f"{'Bearish' if short else 'Bullish'} rejection /\nreversal candle appears", None),
+        (f"M15 confirms the {'failed bounce' if short else 'bounce holds'},\nideally aligned with M30 – H1", None),
+    ]
+    for k, (txt, hl) in enumerate(items):
+        y = 0.685 - k * 0.135
+        ov.add_patch(Ellipse((0.737, y), 0.036, 0.036 * 16 / 9, facecolor="#0d0f14", edgecolor=gold, linewidth=2))
+        ov.text(0.737, y, str(k + 1), color=gold, fontsize=20, fontweight="bold", ha="center", va="center")
+        if hl:
+            ov.text(0.768, y + 0.022, txt, color=fg, fontsize=15, va="center")
+            ov.text(0.768, y - 0.022, hl, color=gold, fontsize=16, fontweight="bold", va="center")
+        else:
+            ov.text(0.768, y, txt, color=fg, fontsize=15, va="center", linespacing=1.35)
+        if k < 2:
+            ov.plot([0.72, 0.972], [y - 0.068, y - 0.068], color="#2a2f3a", linewidth=1)
+
+    # ---- warning box
+    box(0.705, 0.06, 0.282, 0.20, accent, face="#1a0b0e" if short else "#0b1a10")
+    ov.text(0.745, 0.16, "⚠", color=accent, fontsize=48, ha="center", va="center")
+    ov.text(0.79, 0.195, f"Don't FOMO {a['direction']}", color=accent, fontsize=17, fontweight="bold", va="center")
+    ov.text(0.79, 0.13, f"after a big {'red' if short else 'green'} candle —\nwait for confirmation.",
+            color=fg, fontsize=14, va="center", linespacing=1.35)
+
     fig.savefig(path, facecolor=bg)
     plt.close(fig)
     return path
@@ -387,13 +586,13 @@ def telegram_call(token, method, fields, files=None):
     return result["result"]["message_id"]
 
 
-def send_post(token, chat_id, text, chart_path):
-    with open(chart_path, "rb") as f:
+def send_post(token, chat_id, text, image_path):
+    with open(image_path, "rb") as f:
         photo = ("btc_plan.png", f.read(), "image/png")
     if visible_len(text) <= CAPTION_LIMIT:
         return [telegram_call(token, "sendPhoto", {"chat_id": chat_id, "caption": text, "parse_mode": "HTML"},
                               {"photo": photo})]
-    # Too long for a caption: chart first, full text right after.
+    # Too long for a caption: plan image first, full text right after.
     first = telegram_call(token, "sendPhoto", {"chat_id": chat_id}, {"photo": photo})
     second = telegram_call(token, "sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
                                                   "disable_web_page_preview": "true"})
@@ -412,9 +611,9 @@ def wait_until(hhmm):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dry-run", action="store_true", help="print the post and save the chart, send nothing")
+    p.add_argument("--dry-run", action="store_true", help="print the post and save the image, send nothing")
     p.add_argument("--wait-until", metavar="HH:MM", help="sleep until this local time before posting")
-    p.add_argument("--chart-out", default="btc_plan.png", help="where to save the chart image")
+    p.add_argument("--chart-out", default="btc_plan.png", help="where to save the plan image")
     args = p.parse_args()
 
     if args.wait_until:
@@ -423,12 +622,12 @@ def main():
     data, source = fetch_market()
     analysis = analyze(data)
     now = datetime.now(TZ)
-    text = build_post(analysis, source, now)
-    draw_chart(data, analysis, source, now, args.chart_out)
+    text = build_post(analysis, data, now)
+    draw_plan_image(data, analysis, now, args.chart_out)
 
     if args.dry_run:
         print(text)
-        print(f"\n[caption length {visible_len(text)}/{CAPTION_LIMIT}; chart saved to {args.chart_out}]")
+        print(f"\n[source {source}; {visible_len(text)} chars; image saved to {args.chart_out}]")
         return 0
 
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -437,7 +636,7 @@ def main():
         print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set (English channel only).", file=sys.stderr)
         return 2
     ids = send_post(token, chat_id, text, args.chart_out)
-    print(f"Posted message(s) {ids} to {chat_id}")
+    print(f"Posted message(s) {ids} to {chat_id} (data: {source})")
     return 0
 
 
