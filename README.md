@@ -47,8 +47,8 @@ Từ đó trở đi, workflow tự chạy mỗi ngày.
 ## Ghi chú
 - Lịch GitHub thường chạy trễ vài phút, nên job khởi động lúc 08:10 và script tự **đợi đến đúng 08:30**
   mới lấy dữ liệu và đăng. Nếu GitHub trễ quá 20 phút thì bài sẽ đăng ngay khi job chạy.
-- GitHub tự tắt lịch của repo **không có commit nào trong 60 ngày** – vào tab Actions bấm *Enable* lại,
-  hoặc thỉnh thoảng commit một thay đổi nhỏ.
+- Repo để **Private** nên lịch không bị GitHub tự tắt (quy tắc tắt sau 60 ngày không hoạt động chỉ áp dụng
+  cho repo public). Mỗi lượt chạy hằng ngày tốn khoảng 20–25 phút Actions, nằm trong 2.000 phút miễn phí/tháng.
 - Đổi múi giờ: biến môi trường `POST_TZ_OFFSET_HOURS` (mặc định `7`). Đổi tên kênh: `CHANNEL_NAME`.
 - Đăng ngay một bài: tab *Actions → Post NOW to EN channel → Run workflow*
 - Chạy trên máy: `pip install matplotlib && python btc_daily_bot.py --dry-run` (ảnh lưu ở `btc_plan.png`)
