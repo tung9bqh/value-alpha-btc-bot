@@ -23,6 +23,7 @@ import argparse
 import html
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -34,7 +35,9 @@ from datetime import datetime, timedelta, timezone
 
 TZ = timezone(timedelta(hours=int(os.environ.get("POST_TZ_OFFSET_HOURS", "7"))))  # Vietnam = UTC+7
 CHANNEL_NAME = os.environ.get("CHANNEL_NAME", "Value Alpha Crypto")
-ALTCOINS = [c.strip() for c in os.environ.get("ALTCOIN_WATCHLIST", "ETH,SOL,SUI,AVAX,UNI").split(",") if c.strip()]
+ALTCOIN_POOL = [c.strip() for c in os.environ.get(
+    "ALTCOIN_POOL", "ETH,SOL,XAUT,BNB,LTC,SUI,XRP,LINK,AVAX,DOT,NEAR,ADA,DOGE,UNI,ZEC").split(",") if c.strip()]
+ALTCOIN_PICKS = 5
 SL_PCT = float(os.environ.get("SL_PCT", "1.2"))  # stop-loss distance from entry, in %
 TP_RR = (1.0, 1.5)                                # TP1 / TP2 as reward-to-risk multiples
 USER_AGENT = "ValueAlphaBTCBot/3.0"
@@ -167,7 +170,7 @@ def analyze(data):
     direction = "LONG" if total > 0 else "SHORT"
     a = {"price": price, "sig": sig, "total": total, "direction": direction,
          "confidence": "High" if abs(total) >= 0.6 else ("Medium" if abs(total) >= 0.3 else "Low")}
-    a["primary"], a["secondary"] = build_zones(data, sig, price, direction)
+    a["primary"] = build_zone(data, sig, price, direction)
     return a
 
 
@@ -199,8 +202,8 @@ def make_setup(direction, lo, hi):
             "tp1": entry + side * TP_RR[0] * risk, "tp2": entry + side * TP_RR[1] * risk}
 
 
-def build_zones(data, sig, price, direction):
-    """Primary setup (retrace into confluence) and secondary setup (breakdown/breakout retest)."""
+def build_zone(data, sig, price, direction):
+    """Primary setup: retrace into the nearest confluence zone, plus its cancel level."""
     side = 1 if direction == "LONG" else -1
     width = round_to(price * 0.0035, 50) or 50
     levels = candidate_levels(data, sig)
@@ -226,21 +229,13 @@ def build_zones(data, sig, price, direction):
     primary["reasons"] = list(dict.fromkeys(reasons))[:3]
     primary["guard"] = (max(c["h"] for c in recent) if side == -1 else min(c["l"] for c in recent))
 
-    # Secondary: H1 close through the nearest support (short) / resistance (long), then retest.
-    swings = pivots(data["H1"][-72:], 3, "l" if side == -1 else "h")
-    beyond = [v for v in swings if side * (v - price) / price > 0.003]
-    if beyond:
-        trigger = max(beyond) if side == -1 else min(beyond)
+    # Cancel level: the recent swing extreme if it sits between the zone and the SL, else the SL itself.
+    g = primary["guard"]
+    if side == -1:
+        primary["cancel"] = g if primary["hi"] < g < primary["sl"] else primary["sl"]
     else:
-        trigger = min(c["l"] for c in recent) if side == -1 else max(c["h"] for c in recent)
-        if side * (trigger - price) / price <= 0.003:
-            trigger = price * (1 + side * 0.006)
-    trigger = round_to(trigger, 50)
-    retest = round_to(width * 0.8, 50) or 50
-    lo2, hi2 = (trigger, trigger + retest) if side == -1 else (trigger - retest, trigger)
-    secondary = make_setup(direction, lo2, hi2)
-    secondary["trigger"] = trigger
-    return primary, secondary
+        primary["cancel"] = g if primary["sl"] < g < primary["lo"] else primary["sl"]
+    return primary
 
 
 # -------------------------------------------------------------- format
@@ -348,13 +343,18 @@ def ltf_text(a, data):
 
 
 def setup_lines(st):
-    return [f"• Entry: {k_fmt(st['entry'])} | SL: {k_fmt(st['sl'])} ({SL_PCT:g}%)",
-            f"• TP1: {k_fmt(st['tp1'])} (RR 1:{TP_RR[0]:g}) | TP2: {k_fmt(st['tp2'])} (RR 1:{TP_RR[1]:g})"]
+    return [f"• Entry: {k_fmt(st['entry'])}", f"• SL: {k_fmt(st['sl'])}",
+            f"• TP1: {k_fmt(st['tp1'])}", f"• TP2: {k_fmt(st['tp2'])}"]
+
+
+def pick_altcoins(now):
+    """Five random coins from the pool; seeded by date so every run on the same day agrees."""
+    return random.Random(now.strftime("%Y-%m-%d")).sample(ALTCOIN_POOL, min(ALTCOIN_PICKS, len(ALTCOIN_POOL)))
 
 
 def build_post(a, data, now):
     short = a["direction"] == "SHORT"
-    p, s2 = a["primary"], a["secondary"]
+    p = a["primary"]
     word = "Short" if short else "Long"
     zone = f"{k_fmt(p['lo'], 50)}–{k_fmt(p['hi'], 50)}"
     if p["reasons"]:
@@ -366,8 +366,7 @@ def build_post(a, data, now):
         why += f", while remaining below the recent {k_fmt(g, 100)} high"
     elif not short and g < p["lo"]:
         why += f", while holding above the recent {k_fmt(g, 100)} low"
-    trig = k_fmt(s2["trigger"], 50)
-    alts = join_words([f"${c}" for c in ALTCOINS])
+    alts = join_words([f"${c}" for c in pick_altcoins(now)])
 
     lines = [
         f"{'📉' if short else '📈'} <b>BTCUSDT UPDATE — {now:%B %d, %Y}</b>".upper().replace("<B>", "<b>").replace("</B>", "</b>"),
@@ -382,18 +381,19 @@ def build_post(a, data, now):
         "",
         f"▪️ <b>M30 / M15:</b> {html.escape(ltf_text(a, data))}",
         "",
-        f"🎯 <b>KEY {a['direction']} ZONES</b>",
+        f"🎯 <b>KEY {a['direction']} ZONE</b>",
         "",
         f"{'🔴' if short else '🟢'} <b>Primary {word}: {zone}</b>",
         f"Wait for price to {'rebound' if short else 'pull back'} into this zone and show "
         f"{'bearish' if short else 'bullish'} rejection. {html.escape(why)}.",
         *setup_lines(p),
         "",
-        f"{'🔻 <b>Breakdown' if short else '🔺 <b>Breakout'} {word}: {k_fmt(s2['lo'], 50)}–{k_fmt(s2['hi'], 50)}</b>",
-        f"Only consider this setup if an H1 candle closes {'below' if short else 'above'} {trig}. "
-        f"Then wait for price to retest the broken {'support' if short else 'resistance'} zone before considering a "
-        f"{word.lower()} entry. Do not chase the price during a sharp {'sell-off' if short else 'rally'}.",
-        *setup_lines(s2),
+        f"🚫 <b>Cancel {word} Scenario</b>",
+        f"• An H1 candle closes {'above' if short else 'below'} {k_fmt(p['cancel'])} — the "
+        f"{'bearish' if short else 'bullish'} structure is broken: exit or stand aside.",
+        f"• Price {'drops' if short else 'rallies'} to {k_fmt(p['tp1'])} before reaching the zone — "
+        "the move has played out: do not chase.",
+        "• The zone is not reached by the end of the day — the plan expires.",
         "",
         "📊 <b>ALTCOIN WATCHLIST</b>",
         f"Keep an eye on {alts}. Combine our trading indicators with technical analysis and wait for "

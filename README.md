@@ -11,14 +11,18 @@ khung *Entry Conditions* (3 điều kiện) và cảnh báo *Don't FOMO*.
 **Bài viết (tiếng Anh)**:
 - `BTCUSDT UPDATE — <ngày>` và `PRIMARY BIAS: LONG/SHORT`
 - `MULTI-TIMEFRAME ANALYSIS`: nhận định H4, H1, M30/M15 (cấu trúc đỉnh/đáy, EMA20/50/200, RSI)
-- `KEY ZONES`: Primary (vùng hồi/điều chỉnh) + Breakdown/Breakout (chờ H1 đóng nến phá vỡ rồi retest)
-- Mỗi setup có Entry (giữa vùng), **SL cố định 1.2%**, **TP1 = RR 1:1**, **TP2 = RR 1:1.5**
-- `ALTCOIN WATCHLIST` và disclaimer
+- `KEY ZONE`: 1 kịch bản Primary (vùng hồi/điều chỉnh) với Entry (giữa vùng), **SL cố định 1.2%**,
+  **TP1 = RR 1:1**, **TP2 = RR 1:1.5**
+- `Cancel Scenario`: khi nào huỷ kịch bản (H1 đóng nến phá cấu trúc, giá chạy tới TP1 trước khi vào vùng,
+  hết ngày không chạm vùng)
+- `ALTCOIN WATCHLIST`: 5 đồng ngẫu nhiên mỗi ngày từ ETH, SOL, XAUT, BNB, LTC, SUI, XRP, LINK, AVAX, DOT,
+  NEAR, ADA, DOGE, UNI, ZEC (cùng một ngày luôn ra cùng 5 đồng)
+- Disclaimer
 
 Dữ liệu: hợp đồng vĩnh cửu **BTCUSDT.P** trên **Bitget** (dự phòng: OKX `BTC-USDT-SWAP`).
 Không cần API key. Trọng số quyết định LONG/SHORT: H4 40%, H1 30%, M30 17%, M15 13%.
 
-Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_WATCHLIST` (mặc định `ETH,SOL,SUI,AVAX,UNI`).
+Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_POOL` (danh sách coin để chọn ngẫu nhiên).
 
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).
