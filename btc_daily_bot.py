@@ -586,6 +586,8 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="print the post and save the image, send nothing")
     p.add_argument("--wait-until", metavar="HH:MM", help="sleep until this local time before posting")
     p.add_argument("--chart-out", default="btc_plan.png", help="where to save the plan image")
+    p.add_argument("--state-dir", help="plan history folder: enables the recap of the previous plan "
+                                       "and saves today's plan for the alert tracker")
     args = p.parse_args()
 
     if args.wait_until:
@@ -598,6 +600,9 @@ def main():
     draw_plan_image(data, analysis, now, args.chart_out)
 
     if args.dry_run:
+        if args.state_dir:
+            import plan_tracker
+            plan_tracker.run_recaps(args.state_dir, data["M15"], now, plan_tracker.make_sender(True))
         print(text)
         print(f"\n[source {source}; {visible_len(text)} chars; image saved to {args.chart_out}]")
         return 0
@@ -607,8 +612,16 @@ def main():
     if not token or not chat_id:
         print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set (English channel only).", file=sys.stderr)
         return 2
+    if args.state_dir:
+        import plan_tracker
+        try:  # a failed recap must never block the morning plan
+            plan_tracker.run_recaps(args.state_dir, data["M15"], now, plan_tracker.make_sender(False))
+        except Exception as e:  # noqa: BLE001
+            print(f"Recap failed: {e}", file=sys.stderr)
     ids = send_post(token, chat_id, text, args.chart_out)
     print(f"Posted message(s) {ids} to {chat_id} (data: {source})")
+    if args.state_dir:
+        plan_tracker.save_plan(args.state_dir, plan_tracker.new_plan(analysis, now, ids))
     return 0
 
 

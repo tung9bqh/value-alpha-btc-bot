@@ -1,0 +1,51 @@
+name: Plan alerts (EN channel)
+
+# Checks today's plan against BTCUSDT.P M15 candles and replies to the morning post
+# when the entry zone, TP1, TP2, the stop-loss or a cancel condition is hit.
+on:
+  schedule:
+    # Every 30 min from 08:05 to 23:35 Vietnam time, hourly overnight
+    # (keeps the private repo inside GitHub's 2,000 free Actions minutes per month).
+    - cron: "5,35 1-16 * * *"
+    - cron: "35 17-23,0 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only print the alerts (do not send to Telegram)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write  # plan history on the 'state' branch
+
+concurrency:
+  group: btc-bot-state
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Load plan history
+        run: bash .github/scripts/state.sh load
+      - name: Check plan and send alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_EN || '@valuealphacrypto' }}
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python plan_tracker.py check --state-dir state --dry-run
+          else
+            python plan_tracker.py check --state-dir state
+          fi
+      - name: Save plan history
+        if: always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/state.sh save

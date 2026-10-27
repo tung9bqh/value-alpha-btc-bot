@@ -24,6 +24,18 @@ Không cần API key. Trọng số quyết định LONG/SHORT: H4 40%, H1 30%, M
 
 Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_POOL` (danh sách coin để chọn ngẫu nhiên).
 
+## Theo dõi plan & tổng kết (tự động)
+- **Cảnh báo** (workflow *Plan alerts*): kiểm tra nến M15 mỗi 30 phút từ 08:05–23:35 (mỗi giờ ban đêm) và
+  **trả lời vào bài 8:30** khi: giá chạm Entry, TP1, TP2, SL, H1 đóng nến phá cấu trúc, hoặc giá chạy tới TP1
+  trước khi vào vùng. Mỗi sự kiện chỉ báo 1 lần; tin cảnh báo ghi giờ xảy ra thực tế.
+- **Tổng kết hằng ngày**: 8:30 sáng hôm sau, ngay trước plan mới, bot đăng kết quả plan hôm qua.
+- **Thống kê tuần**: sáng thứ Hai, kèm tổng kết ngày, đăng track record tuần trước (số plan, thắng/thua,
+  win rate, tổng R).
+- **Cách tính kết quả**: 50% vị thế chốt ở TP1 (dời SL về Entry), 50% chốt ở TP2 → TP2 = +1.25R,
+  TP1 rồi về Entry = +0.5R, SL = −1R. Plan có hiệu lực 24h; hết hạn mà còn lệnh thì tính theo giá đóng cửa.
+  Nếu một nến M15 chạm cả SL và TP, tính SL trước (thận trọng).
+- Lịch sử plan lưu ở nhánh `state` của repo (tự động, không cần chỉnh tay).
+
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).
 - Script chỉ gọi `sendMessage` – **không** gọi `getUpdates` / `setWebhook`, nên nếu bạn
@@ -45,10 +57,11 @@ Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOI
 Từ đó trở đi, workflow tự chạy mỗi ngày.
 
 ## Ghi chú
-- Lịch GitHub thường chạy trễ vài phút, nên job khởi động lúc 08:10 và script tự **đợi đến đúng 08:30**
-  mới lấy dữ liệu và đăng. Nếu GitHub trễ quá 20 phút thì bài sẽ đăng ngay khi job chạy.
+- Lịch GitHub thường chạy trễ vài phút, nên job khởi động lúc 08:20 và script tự **đợi đến đúng 08:30**
+  mới lấy dữ liệu và đăng. Nếu GitHub trễ quá 10 phút thì bài sẽ đăng ngay khi job chạy.
 - Repo để **Private** nên lịch không bị GitHub tự tắt (quy tắc tắt sau 60 ngày không hoạt động chỉ áp dụng
-  cho repo public). Mỗi lượt chạy hằng ngày tốn khoảng 20–25 phút Actions, nằm trong 2.000 phút miễn phí/tháng.
+  cho repo public). Ước tính dùng ~1.550 phút Actions/tháng (bài 8:30 ~11 phút/ngày + cảnh báo ~40 lượt/ngày),
+  nằm trong 2.000 phút miễn phí/tháng của repo private.
 - Đổi múi giờ: biến môi trường `POST_TZ_OFFSET_HOURS` (mặc định `7`). Đổi tên kênh: `CHANNEL_NAME`.
 - Đăng ngay một bài: tab *Actions → Post NOW to EN channel → Run workflow*
 - Chạy trên máy: `pip install matplotlib && python btc_daily_bot.py --dry-run` (ảnh lưu ở `btc_plan.png`)
