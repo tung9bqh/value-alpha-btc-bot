@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Only print the post (do not send to Telegram)"
+        description: "Only preview the post + chart (do not send to Telegram)"
         type: boolean
         default: true
 
@@ -25,6 +25,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Install chart library
+        run: pip install --quiet matplotlib
       - name: Post BTC daily strategy
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -38,3 +40,11 @@ jobs:
           else
             python btc_daily_bot.py
           fi
+      - name: Save chart image (download from the run's Summary page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-plan-chart
+          path: btc_plan.png
+          if-no-files-found: ignore
+          retention-days: 7

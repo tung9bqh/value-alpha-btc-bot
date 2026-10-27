@@ -1,34 +1,48 @@
 #!/usr/bin/env python3
-"""Value Alpha Crypto - BTC daily trading strategy poster (English channel).
+"""Value Alpha Crypto - BTC daily multi-timeframe plan poster (English channel).
 
-Fetches BTC market data, builds a rule-based daily plan (bias, key levels,
-long/short setups) and posts it to ONE Telegram channel: TELEGRAM_CHAT_ID.
+Pulls BTCUSDT.P (USDT-margined perpetual) candles for M15, M30, H1 and H4 from
+Bitget (fallback: OKX BTC-USDT-SWAP), decides the day's direction (LONG or
+SHORT), writes a short analysis, draws a 4-panel chart with the plan on it and
+posts chart + text to ONE Telegram channel: TELEGRAM_CHAT_ID.
 
-The script only calls Telegram's sendMessage. It never calls getUpdates or
-setWebhook, so a bot that already serves another (e.g. Vietnamese) community
-with the same token keeps working untouched.
+The script only calls Telegram's sendPhoto/sendMessage. It never calls
+getUpdates or setWebhook, so a bot that already serves another (e.g.
+Vietnamese) community with the same token keeps working untouched.
 
 Usage:
-    python btc_daily_bot.py --dry-run      # print the post, send nothing
-    python btc_daily_bot.py                # post to TELEGRAM_CHAT_ID
-    python btc_daily_bot.py --wait-until 08:30   # sleep until 08:30 local time first
+    python btc_daily_bot.py --dry-run             # print post + save chart, send nothing
+    python btc_daily_bot.py                       # post to TELEGRAM_CHAT_ID
+    python btc_daily_bot.py --wait-until 08:30    # sleep until 08:30 local time first
 
-Only the standard library is used.
+Requires matplotlib (for the chart); everything else is standard library.
 """
 
 import argparse
 import html
 import json
 import os
+import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from datetime import datetime, timedelta, timezone
 
 TZ = timezone(timedelta(hours=int(os.environ.get("POST_TZ_OFFSET_HOURS", "7"))))  # Vietnam = UTC+7
 CHANNEL_NAME = os.environ.get("CHANNEL_NAME", "Value Alpha Crypto")
-USER_AGENT = "ValueAlphaBTCBot/1.0"
+USER_AGENT = "ValueAlphaBTCBot/2.0"
+
+# Display name -> (Bitget granularity, OKX bar, weight in the daily decision)
+TIMEFRAMES = {
+    "H4": ("4H", "4H", 0.40),
+    "H1": ("1H", "1H", 0.30),
+    "M30": ("30m", "30m", 0.17),
+    "M15": ("15m", "15m", 0.13),
+}
+CAPTION_LIMIT = 1024  # Telegram limit for photo captions (visible characters)
 
 
 # ---------------------------------------------------------------- data
@@ -39,62 +53,66 @@ def http_get_json(url, timeout=20):
         return json.loads(resp.read().decode())
 
 
-def fetch_binance(interval, limit):
-    # data-api.binance.vision serves public market data and, unlike
-    # api.binance.com, is reachable from US-hosted GitHub runners.
-    url = ("https://data-api.binance.vision/api/v3/klines?"
-           + urllib.parse.urlencode({"symbol": "BTCUSDT", "interval": interval, "limit": limit}))
-    rows = http_get_json(url)
-    return [{"t": r[0] // 1000, "o": float(r[1]), "h": float(r[2]), "l": float(r[3]),
-             "c": float(r[4]), "v": float(r[5])} for r in rows]
+def to_candles(rows):
+    out = [{"t": int(r[0]) // 1000, "o": float(r[1]), "h": float(r[2]), "l": float(r[3]),
+            "c": float(r[4]), "v": float(r[5])} for r in rows]
+    return sorted(out, key=lambda c: c["t"])
 
 
-def fetch_coinbase(granularity):
-    url = ("https://api.exchange.coinbase.com/products/BTC-USD/candles?"
-           + urllib.parse.urlencode({"granularity": granularity}))
-    rows = http_get_json(url)  # newest first: [time, low, high, open, close, volume]
-    return [{"t": r[0], "o": float(r[3]), "h": float(r[2]), "l": float(r[1]),
-             "c": float(r[4]), "v": float(r[5])} for r in reversed(rows)]
+def fetch_bitget(granularity):
+    url = ("https://api.bitget.com/api/v2/mix/market/candles?"
+           + urllib.parse.urlencode({"symbol": "BTCUSDT", "productType": "USDT-FUTURES",
+                                     "granularity": granularity, "limit": 300}))
+    body = http_get_json(url)
+    if body.get("code") != "00000" or not body.get("data"):
+        raise RuntimeError(f"bad response: {str(body)[:200]}")
+    return to_candles(body["data"])
+
+
+def fetch_okx(bar):
+    url = ("https://www.okx.com/api/v5/market/candles?"
+           + urllib.parse.urlencode({"instId": "BTC-USDT-SWAP", "bar": bar, "limit": 300}))
+    body = http_get_json(url)
+    if body.get("code") != "0" or not body.get("data"):
+        raise RuntimeError(f"bad response: {str(body)[:200]}")
+    return to_candles(body["data"])
 
 
 def fetch_market():
-    """Return (daily candles, intraday candles, intraday label, source)."""
+    """Return ({tf: candles}, source label). All timeframes come from one exchange."""
     errors = []
-    try:
-        return fetch_binance("1d", 300), fetch_binance("4h", 200), "4H", "Binance BTC/USDT"
-    except Exception as e:  # noqa: BLE001 - fall through to the next source
-        errors.append(f"binance: {e}")
-    try:
-        return fetch_coinbase(86400), fetch_coinbase(21600), "6H", "Coinbase BTC/USD"
-    except Exception as e:  # noqa: BLE001
-        errors.append(f"coinbase: {e}")
+    for name, fetch, idx in (("Bitget", fetch_bitget, 0), ("OKX", fetch_okx, 1)):
+        try:
+            return {tf: fetch(spec[idx]) for tf, spec in TIMEFRAMES.items()}, name
+        except Exception as e:  # noqa: BLE001 - fall through to the next exchange
+            errors.append(f"{name}: {e}")
     raise RuntimeError("All market data sources failed: " + "; ".join(errors))
 
 
 # ---------------------------------------------------------- indicators
 
-def ema(values, period):
+def ema_series(values, period):
+    out = [None] * len(values)
+    if len(values) < period:
+        return out
     k = 2 / (period + 1)
-    out = sum(values[:period]) / period
-    for v in values[period:]:
-        out = v * k + out * (1 - k)
+    out[period - 1] = sum(values[:period]) / period
+    for i in range(period, len(values)):
+        out[i] = values[i] * k + out[i - 1] * (1 - k)
     return out
 
 
 def rsi(closes, period=14):
     gains, losses = [], []
     for prev, cur in zip(closes, closes[1:]):
-        d = cur - prev
-        gains.append(max(d, 0.0))
-        losses.append(max(-d, 0.0))
+        gains.append(max(cur - prev, 0.0))
+        losses.append(max(prev - cur, 0.0))
     avg_g = sum(gains[:period]) / period
     avg_l = sum(losses[:period]) / period
     for g, l in zip(gains[period:], losses[period:]):
         avg_g = (avg_g * (period - 1) + g) / period
         avg_l = (avg_l * (period - 1) + l) / period
-    if avg_l == 0:
-        return 100.0
-    return 100 - 100 / (1 + avg_g / avg_l)
+    return 100.0 if avg_l == 0 else 100 - 100 / (1 + avg_g / avg_l)
 
 
 def atr(candles, period=14):
@@ -106,188 +124,280 @@ def atr(candles, period=14):
     return out
 
 
+def macd_hist(closes):
+    fast, slow = ema_series(closes, 12), ema_series(closes, 26)
+    line = [f - s for f, s in zip(fast[25:], slow[25:])]
+    signal = ema_series(line, 9)
+    return [m - s for m, s in zip(line[8:], signal[8:])]
+
+
 # ------------------------------------------------------------ analysis
 
-def analyze(daily, intraday):
-    price = intraday[-1]["c"]
-    closes = [c["c"] for c in daily]
-    y = daily[-2]  # last completed daily candle (UTC)
-
-    pivot = (y["h"] + y["l"] + y["c"]) / 3
-    levels = {
-        "R2": pivot + (y["h"] - y["l"]),
-        "R1": 2 * pivot - y["l"],
-        "P": pivot,
-        "S1": 2 * pivot - y["h"],
-        "S2": pivot - (y["h"] - y["l"]),
-    }
-    week = intraday[-42:] if len(intraday) >= 42 else intraday  # ~7 days of 4H
-    swing_high = max(c["h"] for c in week)
-    swing_low = min(c["l"] for c in week)
-
-    e20, e50, e200 = ema(closes, 20), ema(closes, 50), ema(closes, 200)
-    d_atr = atr(daily)
-    rsi_d = rsi(closes)
-    rsi_i = rsi([c["c"] for c in intraday])
-
-    # 24h change measured on intraday candles so it is a true rolling 24h.
-    bars_24h = max(1, round(86400 / (intraday[-1]["t"] - intraday[-2]["t"])))
-    ref = intraday[-1 - bars_24h]["c"] if len(intraday) > bars_24h else intraday[0]["c"]
-    change_24h = (price / ref - 1) * 100
-
-    score = 0
-    score += 1 if price > e20 else -1
-    score += 1 if price > e50 else -1
-    score += 1 if e20 > e50 else -1
-    score += 1 if price > e200 else -1
-    score += 1 if rsi_i > 55 else (-1 if rsi_i < 45 else 0)
-    if score >= 3:
-        bias = "BULLISH"
-    elif score <= -3:
-        bias = "BEARISH"
+def analyze_tf(candles):
+    closes = [c["c"] for c in candles]
+    e20, e50 = ema_series(closes, 20), ema_series(closes, 50)
+    hist = macd_hist(closes)
+    price = closes[-1]
+    r = rsi(closes)
+    score = (1 if price > e20[-1] else -1) + (1 if e20[-1] > e50[-1] else -1)
+    score += 1 if r > 55 else (-1 if r < 45 else 0)
+    score += 1 if hist[-1] > 0 else -1
+    trend = "Bullish" if score >= 2 else ("Bearish" if score <= -2 else "Neutral")
+    if price > e20[-1] > e50[-1]:
+        stack = "above a bullish EMA20/50 stack"
+    elif price < e20[-1] < e50[-1]:
+        stack = "below a bearish EMA20/50 stack"
     else:
-        bias = "NEUTRAL / RANGE"
+        stack = "between the EMA20 and EMA50"
+    return {"score": score, "trend": trend, "rsi": r, "e20": e20, "e50": e50,
+            "macd_rising": hist[-1] > hist[-2], "stack": stack, "atr": atr(candles)}
 
-    # Candidate supports/resistances relative to the live price.
-    cands = [("S1", levels["S1"]), ("S2", levels["S2"]), ("Pivot", levels["P"]),
-             ("R1", levels["R1"]), ("R2", levels["R2"]), ("EMA20", e20), ("EMA50", e50),
-             ("EMA200", e200), ("7D high", swing_high), ("7D low", swing_low)]
-    min_gap = 0.15 * d_atr  # ignore levels practically at the current price
-    supports = sorted([c for c in cands if c[1] < price - min_gap], key=lambda c: -c[1])
-    resists = sorted([c for c in cands if c[1] > price + min_gap], key=lambda c: c[1])
-    sup1 = supports[0] if supports else ("ATR support", price - d_atr)
-    sup2 = next((s for s in supports[1:] if s[1] < sup1[1] - 0.3 * d_atr), ("ATR support", sup1[1] - d_atr))
-    res1 = resists[0] if resists else ("ATR resistance", price + d_atr)
-    res2 = next((r for r in resists[1:] if r[1] > res1[1] + 0.3 * d_atr), ("ATR resistance", res1[1] + d_atr))
 
-    long_setup = {
-        "entry_lo": sup1[1], "entry_hi": sup1[1] + 0.2 * d_atr, "entry_ref": sup1[0],
-        "sl": sup1[1] - 0.6 * d_atr, "tp1": res1[1], "tp2": res2[1],
-    }
-    short_setup = {
-        "entry_lo": res1[1] - 0.2 * d_atr, "entry_hi": res1[1], "entry_ref": res1[0],
-        "sl": res1[1] + 0.6 * d_atr, "tp1": sup1[1], "tp2": sup2[1],
-    }
-    for s, side in ((long_setup, 1), (short_setup, -1)):
-        mid = (s["entry_lo"] + s["entry_hi"]) / 2
-        risk = abs(mid - s["sl"])
-        s["rr1"] = abs(s["tp1"] - mid) / risk if risk else 0
-        s["rr2"] = abs(s["tp2"] - mid) / risk if risk else 0
+def key_levels(data, sig):
+    h1, h4, m15 = data["H1"], data["H4"], data["M15"]
+    yday = (datetime.fromtimestamp(h1[-1]["t"], timezone.utc) - timedelta(days=1)).date()
+    prev_day = [c for c in h1 if datetime.fromtimestamp(c["t"], timezone.utc).date() == yday]
+    levels = [
+        ("H1 EMA20", sig["H1"]["e20"][-1]), ("H1 EMA50", sig["H1"]["e50"][-1]),
+        ("H4 EMA20", sig["H4"]["e20"][-1]), ("H4 EMA50", sig["H4"]["e50"][-1]),
+        ("24h high", max(c["h"] for c in h1[-24:])), ("24h low", min(c["l"] for c in h1[-24:])),
+        ("3D high", max(c["h"] for c in h4[-18:])), ("3D low", min(c["l"] for c in h4[-18:])),
+        ("M15 swing high", max(c["h"] for c in m15[-32:])), ("M15 swing low", min(c["l"] for c in m15[-32:])),
+    ]
+    if prev_day:
+        levels += [("PDH", max(c["h"] for c in prev_day)), ("PDL", min(c["l"] for c in prev_day))]
+    return levels
 
-    return {
-        "price": price, "change_24h": change_24h, "bias": bias, "score": score,
-        "levels": levels, "e20": e20, "e50": e50, "e200": e200, "atr": d_atr,
-        "rsi_d": rsi_d, "rsi_i": rsi_i, "swing_high": swing_high, "swing_low": swing_low,
-        "sup1": sup1, "sup2": sup2, "res1": res1, "res2": res2,
-        "long": long_setup, "short": short_setup,
-    }
+
+def build_plan(direction, price, levels, atr1h, atr4h):
+    side = 1 if direction == "LONG" else -1
+    gap = 0.2 * atr1h
+    # Nearest level on the "entry" side of price (support for longs, resistance for shorts).
+    entry_side = sorted([lv for lv in levels if side * (price - lv[1]) > gap], key=lambda lv: side * (price - lv[1]))
+    target_side = sorted([lv for lv in levels if side * (lv[1] - price) > gap], key=lambda lv: side * (lv[1] - price))
+
+    if entry_side and side * (price - entry_side[0][1]) <= 1.5 * atr4h:
+        ref, edge = entry_side[0]
+        far = edge
+        near = edge + side * 0.3 * atr1h
+        if side * (near - price) > 0:  # zone reaches current price
+            near = price
+    else:
+        ref = "pullback"
+        near, far = price - side * 0.3 * atr1h, price - side * 0.8 * atr1h
+    sl = far - side * 0.6 * atr1h
+    mid = (near + far) / 2
+    risk = abs(mid - sl)
+
+    targets = [lv for lv in target_side if side * (lv[1] - mid) >= 1.0 * risk]
+    tp1 = targets[0][1] if targets else mid + side * 1.5 * risk
+    more = [lv[1] for lv in targets if side * (lv[1] - tp1) >= 0.5 * risk]
+    tp2 = more[0] if more else tp1 + side * max(risk, side * (mid + side * 2.5 * risk - tp1))
+    lo, hi = sorted((near, far))
+    return {"direction": direction, "entry_lo": lo, "entry_hi": hi, "entry_ref": ref, "sl": sl,
+            "tp1": tp1, "tp2": tp2, "rr1": abs(tp1 - mid) / risk, "rr2": abs(tp2 - mid) / risk}
+
+
+def analyze(data):
+    sig = {tf: analyze_tf(c) for tf, c in data.items()}
+    price = data["M15"][-1]["c"]
+    h1 = data["H1"]
+    change_24h = (price / h1[-25]["c"] - 1) * 100 if len(h1) > 25 else 0.0
+
+    total = sum(TIMEFRAMES[tf][2] * sig[tf]["score"] / 4 for tf in TIMEFRAMES)  # -1 .. +1
+    if total == 0:
+        total = 0.01 if price > sig["H4"]["e50"][-1] else -0.01
+    direction = "LONG" if total > 0 else "SHORT"
+    confidence = "High" if abs(total) >= 0.6 else ("Medium" if abs(total) >= 0.3 else "Low")
+
+    plan = build_plan(direction, price, key_levels(data, sig), sig["H1"]["atr"], sig["H4"]["atr"])
+    return {"price": price, "change_24h": change_24h, "sig": sig, "total": total,
+            "direction": direction, "confidence": confidence, "plan": plan}
+
+
+def commentary(a):
+    sig, long_ = a["sig"], a["direction"] == "LONG"
+    h4, h1 = sig["H4"], sig["H1"]
+    trend_word = {"Bullish": "bullish", "Bearish": "bearish", "Neutral": "undecided"}
+    stack_agrees = ("bullish" in h4["stack"] and h4["trend"] == "Bullish") or \
+                   ("bearish" in h4["stack"] and h4["trend"] == "Bearish")
+    if stack_agrees or "between" in h4["stack"]:
+        parts = [f"On H4, BTC trades {h4['stack']} with RSI {h4['rsi']:.0f}, "
+                 f"so the higher-timeframe trend is {trend_word[h4['trend']]}."]
+    else:
+        parts = [f"On H4, BTC trades {h4['stack']}, but RSI {h4['rsi']:.0f} and MACD don't confirm, "
+                 f"leaving the higher-timeframe trend {trend_word[h4['trend']]}."]
+
+    if h1["trend"] == h4["trend"] and h1["trend"] != "Neutral":
+        parts.append(f"H1 confirms it, with MACD momentum {'building' if h1['macd_rising'] == (h1['trend'] == 'Bullish') else 'cooling'}.")
+    else:
+        parts.append(f"H1 reads {trend_word[h1['trend']]} (RSI {h1['rsi']:.0f}), "
+                     f"so the intraday picture is {'mixed' if h1['trend'] == 'Neutral' else 'diverging from H4'}.")
+
+    want = "Bullish" if long_ else "Bearish"
+    ltf = [sig["M30"]["trend"], sig["M15"]["trend"]]
+    if all(t == want for t in ltf):
+        parts.append("M30/M15 are aligned, so " + ("dips should be bought quickly." if long_ else "bounces should be sold quickly."))
+    elif all(t not in (want, "Neutral") for t in ltf):
+        parts.append("M30/M15 are still " + ("pulling back" if long_ else "bouncing")
+                     + ", so wait for price to reach the entry zone instead of chasing.")
+    else:
+        parts.append("M30/M15 are mixed, so patience at the entry zone is key.")
+    if a["confidence"] == "Low":
+        parts.append("Signals are weak today: trade smaller.")
+    return " ".join(parts)
 
 
 # -------------------------------------------------------------- format
 
-def usd(x):
-    return f"${round(x / 10) * 10:,.0f}"
+def usd(x, step=10):
+    return f"{round(x / step) * step:,.0f}"
 
 
-def rsi_label(v):
-    if v >= 70:
-        return "overbought"
-    if v <= 30:
-        return "oversold"
-    if v >= 55:
-        return "bullish momentum"
-    if v <= 45:
-        return "bearish momentum"
-    return "neutral"
-
-
-def setup_block(title, s, side):
-    verb = "Buy" if side == "long" else "Sell"
-    return (
-        f"<b>{title}</b>\n"
-        f"• Entry: {verb} zone {usd(s['entry_lo'])} – {usd(s['entry_hi'])} ({html.escape(s['entry_ref'])})\n"
-        f"• Stop-loss: {usd(s['sl'])}\n"
-        f"• TP1: {usd(s['tp1'])} (R:R {s['rr1']:.1f}) | TP2: {usd(s['tp2'])} (R:R {s['rr2']:.1f})"
-    )
-
-
-def build_post(a, intraday_label, source, now):
-    emoji = {"BULLISH": "🟢", "BEARISH": "🔴"}.get(a["bias"], "🟡")
+def build_post(a, source, now):
+    p, sig = a["plan"], a["sig"]
+    dot = {"Bullish": "🟢", "Bearish": "🔴", "Neutral": "🟡"}
     arrow = "▲" if a["change_24h"] >= 0 else "▼"
-    lv = a["levels"]
-
-    if a["bias"] == "BULLISH":
-        primary = setup_block("✅ Primary plan – LONG on pullback", a["long"], "long")
-        alt = (f"<b>⚠️ Alternative</b>\n"
-               f"A {intraday_label} close below {usd(a['long']['sl'])} invalidates the long idea; "
-               f"expect a move toward {usd(a['sup2'][1])}. Breakout traders: a {intraday_label} close above "
-               f"{usd(a['res1'][1])} opens {usd(a['res2'][1])}.")
-        view = ("Trend structure favours buyers. Don't chase green candles – "
-                "let price come back to support and buy with a defined stop.")
-    elif a["bias"] == "BEARISH":
-        primary = setup_block("✅ Primary plan – SHORT on rally", a["short"], "short")
-        alt = (f"<b>⚠️ Alternative</b>\n"
-               f"A {intraday_label} close above {usd(a['short']['sl'])} invalidates the short idea; "
-               f"expect a squeeze toward {usd(a['res2'][1])}. Breakdown traders: a {intraday_label} close below "
-               f"{usd(a['sup1'][1])} opens {usd(a['sup2'][1])}.")
-        view = ("Sellers control the structure. Avoid catching knives – "
-                "sell strength into resistance and keep size small.")
-    else:
-        primary = (setup_block("✅ Range plan – LONG near support", a["long"], "long") + "\n\n"
-                   + setup_block("✅ Range plan – SHORT near resistance", a["short"], "short"))
-        alt = (f"<b>⚠️ Breakout watch</b>\n"
-               f"A {intraday_label} close above {usd(a['res1'][1])} → momentum long toward {usd(a['res2'][1])}. "
-               f"A {intraday_label} close below {usd(a['sup1'][1])} → momentum short toward {usd(a['sup2'][1])}.")
-        view = ("Mixed signals – BTC is ranging. Trade the edges, not the middle, "
-                "and cut quickly if the range breaks.")
-
+    long_ = a["direction"] == "LONG"
+    tf_lines = [f"{dot[sig[tf]['trend']]} {tf:<3} {sig[tf]['trend']} · RSI {sig[tf]['rsi']:.0f}" for tf in TIMEFRAMES]
+    offset = now.utcoffset().total_seconds() / 3600
     return "\n".join([
-        f"☀️ <b>{html.escape(CHANNEL_NAME)} | BTC Daily Strategy</b>",
-        f"📅 {now:%a, %b %d, %Y} • {now:%H:%M} (UTC{now.utcoffset().total_seconds() / 3600:+g})",
+        f"📊 <b>{html.escape(CHANNEL_NAME)} | BTC Daily Plan</b>",
+        f"📅 {now:%a, %b %d, %Y} • {now:%H:%M} (UTC{offset:+g})",
+        f"💰 <b>BTCUSDT.P:</b> ${usd(a['price'], 1)} ({arrow} {a['change_24h']:+.2f}% 24h)",
         "",
-        f"💰 <b>Price:</b> {usd(a['price'])} ({arrow} {a['change_24h']:+.2f}% 24h)",
-        f"{emoji} <b>Bias:</b> {a['bias']}",
+        "<b>🔎 Multi-timeframe</b>",
+        *tf_lines,
         "",
-        "<b>📊 Market snapshot</b>",
-        f"• EMA20 / EMA50 / EMA200 (D1): {usd(a['e20'])} / {usd(a['e50'])} / {usd(a['e200'])}",
-        f"• RSI D1: {a['rsi_d']:.0f} ({rsi_label(a['rsi_d'])}) | RSI {intraday_label}: {a['rsi_i']:.0f} ({rsi_label(a['rsi_i'])})",
-        f"• Daily ATR: {usd(a['atr'])} (expected daily range)",
-        f"• 7D range: {usd(a['swing_low'])} – {usd(a['swing_high'])}",
+        "<b>🧠 Analysis</b>",
+        html.escape(commentary(a)),
         "",
-        "<b>🎯 Key levels</b>",
-        f"• Resistance: {usd(lv['R1'])} (R1) | {usd(lv['R2'])} (R2)",
-        f"• Pivot: {usd(lv['P'])}",
-        f"• Support: {usd(lv['S1'])} (S1) | {usd(lv['S2'])} (S2)",
+        f"<b>🎯 TODAY: {a['direction']} {'🟢' if long_ else '🔴'}</b> (confidence: {a['confidence']})",
+        f"• Entry: {usd(p['entry_lo'])} – {usd(p['entry_hi'])}",
+        f"• SL: {usd(p['sl'])}",
+        f"• TP1: {usd(p['tp1'])} ({p['rr1']:.1f}R) | TP2: {usd(p['tp2'])} ({p['rr2']:.1f}R)",
+        f"• Invalid if H1 closes {'below' if long_ else 'above'} {usd(p['sl'])}",
         "",
-        primary,
-        "",
-        alt,
-        "",
-        f"🧠 <b>Takeaway:</b> {view}",
-        "",
-        "🛡 Risk max 1–2% of capital per trade. Move SL to entry after TP1.",
-        f"<i>Data: {html.escape(source)}. Educational content, not financial advice. DYOR.</i>",
+        "🛡 Risk 1–2%/trade · Move SL to entry at TP1",
+        f"<i>Data: {source} BTCUSDT.P. Not financial advice. DYOR.</i>",
     ])
+
+
+def visible_len(text):
+    return len(html.unescape(re.sub(r"<[^>]+>", "", text)))
+
+
+# --------------------------------------------------------------- chart
+
+def draw_chart(data, a, source, now, path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker  # noqa: F401 - used via matplotlib.ticker below
+
+    bg, panel, grid, fg = "#0b0e11", "#12161c", "#1f2630", "#c9d1d9"
+    up, down = "#2ebd85", "#f6465d"
+    p = a["plan"]
+    long_ = a["direction"] == "LONG"
+    bars = {"H4": 42, "H1": 72, "M30": 80, "M15": 96}
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10), dpi=100, facecolor=bg)
+    for ax, tf in zip(axes.flat, TIMEFRAMES):
+        candles = data[tf][-bars[tf]:]
+        n = len(candles)
+        sig = a["sig"][tf]
+        ax.set_facecolor(panel)
+        for i, c in enumerate(candles):
+            col = up if c["c"] >= c["o"] else down
+            ax.vlines(i, c["l"], c["h"], color=col, linewidth=1)
+            ax.bar(i, max(abs(c["c"] - c["o"]), 1e-6), bottom=min(c["o"], c["c"]), color=col, width=0.65)
+        xs = range(n)
+        ax.plot(xs, sig["e20"][-n:], color="#f0b90b", linewidth=1.2, label="EMA20")
+        ax.plot(xs, sig["e50"][-n:], color="#3d8bfd", linewidth=1.2, label="EMA50")
+
+        ax.axhspan(p["entry_lo"], p["entry_hi"], color="#3d8bfd", alpha=0.18)
+        lines = [("ENTRY", (p["entry_lo"] + p["entry_hi"]) / 2, "#3d8bfd"), ("SL", p["sl"], down),
+                 ("TP1", p["tp1"], up), ("TP2", p["tp2"], up)]
+        ys = [c["l"] for c in candles] + [c["h"] for c in candles] + [y for _, y, _ in lines]
+        pad = (max(ys) - min(ys)) * 0.05
+        ymin, ymax = min(ys) - pad, max(ys) + pad
+        ax.set_ylim(ymin, ymax)
+
+        # Spread the labels so they never overlap, even when the levels are close.
+        min_gap = (ymax - ymin) * 0.045
+        placed = []
+        for name, y, col in sorted(lines, key=lambda x: x[1]):
+            ty = max(y, placed[-1] + min_gap) if placed else y
+            placed.append(ty)
+            ax.axhline(y, color=col, linestyle="--", linewidth=1)
+            ax.text(n + 0.5, ty, f" {name} {usd(y)}", color=col, va="center", fontsize=9, fontweight="bold")
+        ax.set_xlim(-1, n + max(12, int(n * 0.24)))  # room for the level labels
+        ticks = list(range(0, n, max(1, n // 6)))
+        fmt = "%d/%m" if tf == "H4" else "%H:%M"
+        ax.set_xticks(ticks)
+        ax.set_xticklabels([datetime.fromtimestamp(candles[i]["t"], TZ).strftime(fmt) for i in ticks])
+        tcol = {"Bullish": up, "Bearish": down, "Neutral": "#f0b90b"}[sig["trend"]]
+        ax.set_title(f"{tf}  •  {sig['trend']}  •  RSI {sig['rsi']:.0f}", color=tcol, loc="left",
+                     fontsize=12, fontweight="bold")
+        ax.tick_params(colors=fg, labelsize=8)
+        ax.yaxis.tick_right()
+        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+        ax.grid(color=grid, linewidth=0.6)
+        for s in ax.spines.values():
+            s.set_color(grid)
+        ax.legend(loc="best", fontsize=8, facecolor=panel, edgecolor=grid, labelcolor=fg, framealpha=0.85)
+        ax.text(0.5, 0.5, CHANNEL_NAME, transform=ax.transAxes, ha="center", va="center",
+                fontsize=26, color=fg, alpha=0.06, fontweight="bold")
+
+    fig.suptitle(f"BTCUSDT.P ({source})  •  {now:%d %b %Y %H:%M} (UTC{now.utcoffset().total_seconds() / 3600:+g})"
+                 f"   |   TODAY: {a['direction']}  ({a['confidence']} confidence)",
+                 color=up if long_ else down, fontsize=16, fontweight="bold")
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    fig.savefig(path, facecolor=bg)
+    plt.close(fig)
+    return path
 
 
 # --------------------------------------------------------------- send
 
-def send_telegram(token, chat_id, text):
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = urllib.parse.urlencode({
-        "chat_id": chat_id, "text": text, "parse_mode": "HTML",
-        "disable_web_page_preview": "true",
-    }).encode()
-    req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT})
+def telegram_call(token, method, fields, files=None):
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    if files:
+        boundary = uuid.uuid4().hex
+        body = b""
+        for k, v in fields.items():
+            body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").encode()
+        for k, (fname, content, ctype) in files.items():
+            body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"; filename=\"{fname}\"\r\n"
+                     f"Content-Type: {ctype}\r\n\r\n").encode() + content + b"\r\n"
+        body += f"--{boundary}--\r\n".encode()
+        headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    else:
+        body = urllib.parse.urlencode(fields).encode()
+        headers = {}
+    req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT, **headers})
     try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            body = json.loads(resp.read().decode())
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         # Never echo the URL: it contains the bot token.
         raise RuntimeError(f"Telegram API error {e.code}: {e.read().decode(errors='replace')}") from None
-    if not body.get("ok"):
-        raise RuntimeError(f"Telegram API error: {body}")
-    return body["result"]["message_id"]
+    if not result.get("ok"):
+        raise RuntimeError(f"Telegram API error: {result}")
+    return result["result"]["message_id"]
+
+
+def send_post(token, chat_id, text, chart_path):
+    with open(chart_path, "rb") as f:
+        photo = ("btc_plan.png", f.read(), "image/png")
+    if visible_len(text) <= CAPTION_LIMIT:
+        return [telegram_call(token, "sendPhoto", {"chat_id": chat_id, "caption": text, "parse_mode": "HTML"},
+                              {"photo": photo})]
+    # Too long for a caption: chart first, full text right after.
+    first = telegram_call(token, "sendPhoto", {"chat_id": chat_id}, {"photo": photo})
+    second = telegram_call(token, "sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "HTML",
+                                                  "disable_web_page_preview": "true"})
+    return [first, second]
 
 
 def wait_until(hhmm):
@@ -302,19 +412,23 @@ def wait_until(hhmm):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dry-run", action="store_true", help="print the post instead of sending it")
+    p.add_argument("--dry-run", action="store_true", help="print the post and save the chart, send nothing")
     p.add_argument("--wait-until", metavar="HH:MM", help="sleep until this local time before posting")
+    p.add_argument("--chart-out", default="btc_plan.png", help="where to save the chart image")
     args = p.parse_args()
 
     if args.wait_until:
         wait_until(args.wait_until)
 
-    daily, intraday, label, source = fetch_market()
-    analysis = analyze(daily, intraday)
+    data, source = fetch_market()
+    analysis = analyze(data)
+    now = datetime.now(TZ)
+    text = build_post(analysis, source, now)
+    draw_chart(data, analysis, source, now, args.chart_out)
 
-    text = build_post(analysis, label, source, datetime.now(TZ))
     if args.dry_run:
         print(text)
+        print(f"\n[caption length {visible_len(text)}/{CAPTION_LIMIT}; chart saved to {args.chart_out}]")
         return 0
 
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -322,8 +436,8 @@ def main():
     if not token or not chat_id:
         print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set (English channel only).", file=sys.stderr)
         return 2
-    message_id = send_telegram(token, chat_id, text)
-    print(f"Posted message {message_id} to {chat_id}")
+    ids = send_post(token, chat_id, text, args.chart_out)
+    print(f"Posted message(s) {ids} to {chat_id}")
     return 0
 
 
