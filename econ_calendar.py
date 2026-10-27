@@ -252,7 +252,7 @@ def draw_calendar(events, day, path):
     # ---- events table
     cols = [0.03, 0.105, 0.19, 0.38, 0.47, 0.56, 0.775]
     top, head_h = 0.745, 0.065
-    row_h = min(0.058, (top - head_h - 0.375) / max(len(events), 1))
+    row_h = min(0.095, (top - head_h - 0.375) / max(len(events), 1))
     bottom = top - head_h - row_h * len(events)
     box(cols[0], bottom, cols[-1] - cols[0], top - bottom, edge=gold_dim, lw=1.6, r=0.01)
     ax.add_patch(Rectangle((cols[0] + 0.002, top - head_h), cols[-1] - cols[0] - 0.004, head_h - 0.004,
@@ -279,6 +279,11 @@ def draw_calendar(events, day, path):
                                                 ("Bearish", red, "bold")], 9.5)
         rich(cols[5] + 0.008, ym - row_h * 0.2, [("▲ ", green, "bold"), (down_txt + " ", white, "normal"),
                                                 ("Bullish", green, "bold")], 9.5)
+
+    if bottom - 0.36 > 0.05:  # few events: fill the gap with a timezone note
+        text((cols[0] + cols[-1]) / 2, (bottom + 0.36) / 2,
+             "All times in UTC   •   Vietnam time = UTC+7   •   High-impact USD events only (ForexFactory)",
+             10, muted, ha="center")
 
     # ---- what these events mean
     bx, by, bw, bh = 0.03, 0.075, 0.475, 0.285
