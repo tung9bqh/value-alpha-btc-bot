@@ -1,0 +1,26 @@
+📉 <b>BTCUSDT UPDATE — OCTOBER 27, 2026</b>
+
+🔴 <b>PRIMARY BIAS: SHORT</b>
+
+🔎 <b>MULTI-TIMEFRAME ANALYSIS</b>
+H4 keeps printing lower highs (82K → 80.8K) below all key EMAs, H1 is holding below EMA20/50, and M30/M15 momentum is weak (RSI 40).
+
+👉 <b>Conclusion:</b> Timeframes are aligned to the downside — sell rebounds into resistance rather than chasing the move.
+
+🎯 <b>KEY SHORT ZONE</b>
+
+🔴 <b>Primary Short: 79.9K–80.2K</b>
+Wait for price to rebound into this zone and show bearish rejection. This area aligns with H1 EMA20, H1 EMA50, and M15 EMA20, while remaining below the recent 80.8K high.
+• Entry: 80.05K | SL: 81.01K | TP1: 79.09K | TP2: 78.61K
+
+🚫 <b>Cancel Short Scenario</b>
+• An H1 candle closes above 80.81K — the bearish structure is broken: exit or stand aside.
+• Price drops to 79.09K before reaching the zone — the move has played out: do not chase.
+• The zone is not reached by the end of the day — the plan expires.
+
+📊 <b>ALTCOIN WATCHLIST</b>
+Keep an eye on $SOL, $SUI, $ETH, $UNI, and $AVAX. Combine our trading indicators with technical analysis and wait for confirmation before entering any trade.
+
+⚠️ <i>This analysis is for reference only, not financial advice. Always manage your risk and trade according to your plan.</i>
+
+[source Bitget; 1185 chars; image saved to btc_plan.png]
