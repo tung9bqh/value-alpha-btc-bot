@@ -588,8 +588,17 @@ def main():
     p.add_argument("--chart-out", default="btc_plan.png", help="where to save the plan image")
     p.add_argument("--state-dir", help="plan history folder: enables the recap of the previous plan "
                                        "and saves today's plan for the alert tracker")
+    p.add_argument("--once-per-day", action="store_true",
+                   help="skip if today's plan is already in --state-dir (guards against late/duplicate triggers)")
     args = p.parse_args()
 
+    def already_posted():
+        today = f"{datetime.now(TZ):%Y-%m-%d}"
+        return bool(args.state_dir) and os.path.exists(os.path.join(args.state_dir, "plans", f"{today}.json"))
+
+    if args.once_per_day and not args.dry_run and already_posted():
+        print("Today's plan was already posted - skipping.")
+        return 0
     if args.wait_until:
         wait_until(args.wait_until)
 

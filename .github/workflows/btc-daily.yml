@@ -42,9 +42,9 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
             python btc_daily_bot.py --dry-run --state-dir state | tee preview.txt
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            python btc_daily_bot.py --wait-until 08:30 --state-dir state
+            python btc_daily_bot.py --wait-until 08:30 --state-dir state --once-per-day
           else
-            python btc_daily_bot.py --state-dir state
+            python btc_daily_bot.py --state-dir state --once-per-day
           fi
       - name: Save plan history
         if: always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
