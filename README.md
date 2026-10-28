@@ -25,7 +25,7 @@ Không cần API key. Trọng số quyết định LONG/SHORT: H4 40%, H1 30%, M
 Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_POOL` (danh sách coin để chọn ngẫu nhiên).
 
 ## Theo dõi plan & tổng kết (tự động)
-- **Cảnh báo** (workflow *Plan alerts*): kiểm tra nến M15 **mỗi 10 phút** (cả ngày lẫn đêm) và
+- **Cảnh báo** (workflow *Plan alerts*): kiểm tra nến M15 **mỗi 5 phút** (cả ngày lẫn đêm) và
   **trả lời vào bài 8:30** khi: giá chạm Entry, TP1, TP2, SL, H1 đóng nến phá cấu trúc, hoặc giá chạy tới TP1
   trước khi vào vùng. Mỗi sự kiện chỉ báo 1 lần; tin cảnh báo ghi giờ xảy ra thực tế.
 - **Tổng kết hằng ngày**: 8:30 sáng hôm sau, ngay trước plan mới, bot đăng kết quả plan hôm qua.
@@ -69,7 +69,8 @@ Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào 
 ## Hẹn giờ đúng giờ bằng Cloudflare (`scheduler/`)
 Lịch `schedule:` của GitHub Actions không đảm bảo đúng giờ (có ngày trễ hàng giờ hoặc bỏ qua), nên một
 **Cloudflare Worker** (Cron Triggers, miễn phí) kích hoạt các workflow đúng giờ:
-08:30 bài plan, 12:00 lịch kinh tế, mỗi 5 phút kiểm tra cảnh báo. Lịch GitHub vẫn giữ làm dự phòng;
+08:30 bài plan, 12:00 lịch kinh tế, mỗi 5 phút kiểm tra cảnh báo; nếu lượt 08:30 / 12:00 lỗi thì tự chạy lại
+sau 10 và 25 phút. Lịch GitHub vẫn giữ làm dự phòng;
 bot chỉ đăng plan / lịch kinh tế **một lần mỗi ngày** nên không bị trùng.
 - Cài: tạo token GitHub tại *Settings → Developer settings → Fine-grained tokens* (chỉ repo này,
   quyền **Actions: Read and write**), thêm vào secret repo `GH_DISPATCH_TOKEN`, rồi chạy

@@ -7,4 +7,4 @@ workers_dev = false
 
 [triggers]
 # UTC. Keep in sync with JOBS in worker.js.
-crons = ["29 1 * * *", "59 4 * * *", "*/5 * * * *"]
+crons = ["29 1 * * *", "40,55 1 * * *", "59 4 * * *", "10,25 5 * * *", "*/5 * * * *"]
