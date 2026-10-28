@@ -1,0 +1,37 @@
+name: Check scheduler token expiry
+
+# Daily: warns (GitHub issue + email) when GH_DISPATCH_TOKEN is missing, invalid
+# or expires within 14 days. Exact timing does not matter, so GitHub's schedule is fine here.
+on:
+  schedule:
+    - cron: "17 2 * * *"  # ~09:17 Vietnam time
+  workflow_dispatch:
+
+permissions:
+  contents: write  # result on the 'state' branch
+  issues: write    # the reminder issue
+
+concurrency:
+  group: btc-bot-state
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Load bot history
+        run: bash .github/scripts/state.sh load
+      - name: Check GH_DISPATCH_TOKEN
+        env:
+          TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          WARN_DAYS: "14"
+        run: bash .github/scripts/token-check.sh
+      - name: Save bot history
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/state.sh save

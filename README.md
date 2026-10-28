@@ -77,6 +77,9 @@ bot chỉ đăng plan / lịch kinh tế **một lần mỗi ngày** nên không
   *Actions → Deploy on-time scheduler (Cloudflare) → Run workflow*. Dùng chung `CLOUDFLARE_API_TOKEN`,
   `CLOUDFLARE_ACCOUNT_ID` với TradingView relay.
 - Token GitHub chỉ lưu trong secret của repo và secret của Worker.
+- **Tự kiểm tra hạn token** (workflow *Check scheduler token expiry*, mỗi ngày): khi `GH_DISPATCH_TOKEN` còn
+  ≤ 14 ngày, đã hết hạn hoặc bị xoá, bot mở **GitHub Issue** nhắc `@tung9bqh` (GitHub gửi email) kèm hướng dẫn
+  gia hạn; nhắc lại lúc còn 7, 3, 1 ngày; tự đóng issue khi token đã được gia hạn.
 
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).
