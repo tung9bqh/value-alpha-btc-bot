@@ -8,3 +8,5 @@ workers_dev = true
 
 [vars]
 CHAT_ID = "@valuealphacrypto"
+# Margin (USDT) the TP replies compute ROI / PnL on.
+RESULT_MARGIN = "2500"

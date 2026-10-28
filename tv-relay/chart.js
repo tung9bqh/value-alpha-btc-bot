@@ -1,18 +1,22 @@
-// Signal chart for the entry post: candles + EMA20/50/200 + SL/TP zones,
-// drawn as an SVG page that Cloudflare Browser Rendering turns into a PNG.
+// Signal chart: candles + EMA20/50/200 + SL/TP zones, drawn as an SVG page
+// that Cloudflare Browser Run turns into a PNG. Used for the entry post and,
+// with `hit`, for the TP1 / TP2 replies (price reaching the zone + profit).
 
 export const CHART_WIDTH = 1280;
 export const CHART_HEIGHT = 820;
 
 const BARS_BEFORE = 72;  // candles shown up to and including the signal bar
-const BARS_AFTER = 22;   // empty space on the right for the zones
+const MIN_BEFORE = 24;   // ...shrunk to this when the trade ran long
+const MAX_BARS = 150;    // visible candles at most
+const BARS_AFTER = 22;   // empty space right of the last candle (entry chart)
+const HIT_AFTER = 16;    // ...and on TP replies, where the zone labels move into it
 const ZONE_BARS = 15;    // same length as the indicator's SL/TP boxes
 
 const C = {
   bg: "#0d111c", grid: "#1b2130", axis: "#8a93a6", text: "#d7dce6",
   up: "#26a69a", down: "#ef5350",
   ema20: "#f5d430", ema50: "#2f6fea", ema200: "#9b3fc4",
-  sl: "#ef5350", tp: "#26a69a", entry: "#c9ced8",
+  sl: "#ef5350", tp: "#26a69a", entry: "#c9ced8", win: "#16d38a",
 };
 
 export function ema(values, period) {
@@ -27,6 +31,8 @@ export function ema(values, period) {
 }
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const money = (n, d) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const signed = (n, d) => (n < 0 ? "-" : "+") + money(Math.abs(n), d);
 
 function niceStep(range, ticks) {
   const raw = range / ticks;
@@ -40,17 +46,35 @@ function hhmm(sec) {
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
-// candles: [{t (sec), o, h, l, c}] ascending, ending at the signal bar.
-// sig: {side, ticker, tf, entry, sl, tp1, tp2, lev, decimals, exchange}
+// Qty = Margin × Leverage ÷ Entry; PnL = Qty × (Exit − Entry), sign flipped
+// for shorts; ROI = PnL ÷ Margin. No fees.
+export function profit({ side, entry, exit, lev, margin }) {
+  const dir = side === "SHORT" ? -1 : 1;
+  const pnl = margin * lev / entry * (exit - entry) * dir;
+  return { pnl, roi: pnl / margin * 100, move: (exit - entry) / entry * 100 * dir };
+}
+
+// candles: [{t (sec), o, h, l, c}] ascending.
+// sig: {side, ticker, tfLabel, entry, sl, tp1, tp2, lev, decimals, exchange,
+//       signalTime (sec, default: last candle),
+//       hit: {label: "TP1"|"TP2", price, margin} for a TP reply}
 export function chartHtml(candles, sig) {
   const closes = candles.map((c) => c.c);
-  const e20 = ema(closes, 20), e50 = ema(closes, 50), e200 = ema(closes, 200);
-  const start = Math.max(0, candles.length - BARS_BEFORE);
+  const emas = [ema(closes, 20), ema(closes, 50), ema(closes, 200)];
+  let sigAt = candles.length - 1;
+  if (sig.signalTime) {
+    const i = candles.findIndex((c) => c.t >= sig.signalTime);
+    if (i >= 0) sigAt = i;
+  }
+  const last = candles.length - 1;
+  const before = Math.max(MIN_BEFORE, Math.min(BARS_BEFORE, MAX_BARS - (last - sigAt)));
+  const start = Math.max(0, sigAt - before + 1, last - MAX_BARS + 1);
   const bars = candles.slice(start);
-  const lines = [e20, e50, e200].map((e) => e.slice(start));
+  const lines = emas.map((e) => e.slice(start));
   const n = bars.length;
-  const slots = n + BARS_AFTER;
-  const sigIdx = n - 1;
+  const sigIdx = sigAt - start;
+  const hit = sig.hit;
+  const slots = n + (hit ? HIT_AFTER : BARS_AFTER);
   const fmt = (v) => v.toFixed(sig.decimals);
   const pct = (v) => `${(Math.abs(v - sig.entry) / sig.entry * 100).toFixed(2)}%`;
   const isLong = sig.side === "LONG";
@@ -61,11 +85,11 @@ export function chartHtml(candles, sig) {
   const x = (i) => L + xStep * (i + 0.5);
 
   const levels = [sig.entry, sig.sl, sig.tp1, sig.tp2];
-  let lo = Math.min(...bars.map((b) => b.l), ...levels, ...lines.flat());
-  let hi = Math.max(...bars.map((b) => b.h), ...levels, ...lines.flat());
-  // Keep EMA200 from squashing the chart when it is far away.
-  lo = Math.max(lo, Math.min(...bars.map((b) => b.l), ...levels) - (hi - lo) * 0.25);
-  hi = Math.min(hi, Math.max(...bars.map((b) => b.h), ...levels) + (hi - lo) * 0.25);
+  const barLo = Math.min(...bars.map((b) => b.l), ...levels);
+  const barHi = Math.max(...bars.map((b) => b.h), ...levels);
+  // EMAs may widen the range, but not so far that EMA200 squashes the candles.
+  let lo = Math.max(Math.min(barLo, ...lines.flat()), barLo - (barHi - barLo) * 0.25);
+  let hi = Math.min(Math.max(barHi, ...lines.flat()), barHi + (barHi - barLo) * 0.25);
   const pad = (hi - lo) * 0.07;
   lo -= pad; hi += pad;
   const y = (v) => T + (hi - v) / (hi - lo) * (B - T);
@@ -82,25 +106,30 @@ export function chartHtml(candles, sig) {
       s.push(`<text x="${R + 12}" y="${y(v) + 5}" fill="${C.axis}" font-size="14">${fmt(v)}</text>`);
     }
   }
-  // time axis: a label every hour
+  // time axis: a label every hour (every 2 hours on long charts)
+  const every = n > 100 ? 7200 : 3600;
   for (let i = 0; i < n; i++) {
-    if (bars[i].t % 3600 === 0) {
+    if (bars[i].t % every === 0) {
       s.push(`<line x1="${x(i)}" x2="${x(i)}" y1="${T}" y2="${B}" stroke="${C.grid}"/>`);
       s.push(`<text x="${x(i)}" y="${B + 24}" fill="${C.axis}" font-size="14" text-anchor="middle">${hhmm(bars[i].t)}</text>`);
     }
   }
   s.push(`<text x="${R}" y="${B + 24}" fill="${C.axis}" font-size="13" text-anchor="end">UTC</text>`);
 
-  // zones (drawn under the candles)
-  const zx = x(sigIdx) - xStep / 2, zw = xStep * ZONE_BARS;
+  // zones (drawn under the candles), reaching past the last candle on TP replies
+  const zx = x(sigIdx) - xStep / 2;
+  const zw = hit ? x(n - 1 + HIT_AFTER - 1) - zx : xStep * ZONE_BARS;
+  // labels sit in the empty space after the last candle on TP replies
+  // (clear of the HIT badge under/over the last candle)
+  const labelX = hit ? Math.min(zx + zw - 48, Math.max(x(n - 1 + HIT_AFTER / 2), x(n - 1) + 110)) : zx + zw / 2;
   const zone = (a, b, color, alpha, label, price, sign) => {
     const top = y(Math.max(a, b)), h = Math.abs(y(a) - y(b));
-    const cy = top + h / 2;
+    const cx = labelX, cy = top + h / 2;
     s.push(`<rect x="${zx}" y="${top}" width="${zw}" height="${h}" fill="${color}" fill-opacity="${alpha}" stroke="${color}" stroke-opacity="0.55"/>`);
-    s.push(`<text x="${zx + zw / 2}" text-anchor="middle" fill="#fff" font-size="15" font-weight="600">` +
-      `<tspan x="${zx + zw / 2}" y="${cy - 10}">${label}</tspan>` +
-      `<tspan x="${zx + zw / 2}" y="${cy + 9}">${fmt(price)}</tspan>` +
-      `<tspan x="${zx + zw / 2}" y="${cy + 28}" font-weight="400">(${sign}${pct(price)})</tspan></text>`);
+    s.push(`<text x="${cx}" text-anchor="middle" fill="#fff" fill-opacity="0.85" font-size="15" font-weight="600">` +
+      `<tspan x="${cx}" y="${cy - 10}">${label}</tspan>` +
+      `<tspan x="${cx}" y="${cy + 9}">${fmt(price)}</tspan>` +
+      `<tspan x="${cx}" y="${cy + 28}" font-weight="400">(${sign}${pct(price)})</tspan></text>`);
   };
   zone(sig.entry, sig.sl, C.sl, 0.16, "SL", sig.sl, "-");
   zone(sig.entry, sig.tp1, C.tp, 0.14, "TP1", sig.tp1, "+");
@@ -114,7 +143,7 @@ export function chartHtml(candles, sig) {
   });
 
   // candles
-  const bw = Math.max(3, xStep * 0.64);
+  const bw = Math.max(2.5, xStep * 0.64);
   bars.forEach((b, i) => {
     const color = b.c >= b.o ? C.up : C.down;
     const top = y(Math.max(b.o, b.c)), h = Math.max(1.2, Math.abs(y(b.o) - y(b.c)));
@@ -122,12 +151,11 @@ export function chartHtml(candles, sig) {
     s.push(`<rect x="${x(i) - bw / 2}" y="${top}" width="${bw}" height="${h}" fill="${color}"/>`);
   });
 
-  // signal label with a pointer to the signal candle
+  // signal label with a pointer to the signal candle, left of it so the zone labels stay readable
   const sb = bars[sigIdx];
   const lblW = 260, lblH = sig.lev ? 84 : 62;
   const lblColor = isLong ? C.up : C.down;
   const px = x(sigIdx);
-  // Sit left of the signal candle so the zone labels stay readable.
   const lx = Math.max(L + 6, px - lblW + 24);
   const ly = isLong ? y(sb.l) + 16 : y(sb.h) - 16 - lblH;
   const tip = isLong ? `${px - 8},${ly} ${px + 8},${ly} ${px},${ly - 10}` : `${px - 8},${ly + lblH} ${px + 8},${ly + lblH} ${px},${ly + lblH + 10}`;
@@ -148,19 +176,47 @@ export function chartHtml(candles, sig) {
   tag(sig.tp1, C.tp, "TP1");
   tag(sig.entry, "#5d6577", "");
 
+  // TP reply: mark where the target was reached and show the profit
+  let headRight = `<text x="${W - 24}" y="66" fill="${lblColor}" font-size="17" font-weight="700" text-anchor="end">${sig.side} SIGNAL</text>`;
+  if (hit) {
+    const hx = x(n - 1), hy = y(hit.price);
+    s.push(`<line x1="${zx}" x2="${hx}" y1="${hy}" y2="${hy}" stroke="${C.win}" stroke-width="2" stroke-dasharray="7 5"/>`);
+    s.push(`<circle cx="${hx}" cy="${hy}" r="11" fill="none" stroke="${C.win}" stroke-width="3"/>`);
+    s.push(`<circle cx="${hx}" cy="${hy}" r="4.5" fill="${C.win}"/>`);
+    // badge on the side the price came from is busy; put it past the target
+    const hl = `${hit.label} HIT`, hw = 112;
+    const hlx = Math.max(L, hx - hw / 2), hly = isLong ? hy - 52 : hy + 22;
+    s.push(`<rect x="${hlx}" y="${hly}" width="${hw}" height="30" rx="6" fill="${C.win}"/>`);
+    s.push(`<text x="${hlx + hw / 2}" y="${hly + 21}" fill="#06231a" font-size="16" font-weight="800" text-anchor="middle">${hl}</text>`);
+
+    const p = profit({ side: sig.side, entry: sig.entry, exit: hit.price, lev: Number(sig.lev) || 1, margin: hit.margin });
+    // profit panel in the chart corner away from the price action
+    const pw = 360, ph = 150;
+    const startAbove = (bars[0].h + bars[0].l) / 2 < (hi + lo) / 2;
+    const pX = L + 16, pY = startAbove ? B - ph - 16 : T + 16;
+    s.push(`<rect x="${pX}" y="${pY}" width="${pw}" height="${ph}" rx="14" fill="#0b0f19" fill-opacity="0.9" stroke="${C.win}" stroke-opacity="0.55"/>`);
+    s.push(`<text x="${pX + 22}" y="${pY + 34}" fill="${C.axis}" font-size="15" font-weight="600" letter-spacing="1">${hl} · ${esc(sig.side)} ${sig.lev ? esc(sig.lev) + "X" : ""}</text>`);
+    s.push(`<text x="${pX + 20}" y="${pY + 92}" fill="${C.win}" font-size="56" font-weight="800">${signed(p.roi, 2)}%</text>`);
+    s.push(`<text x="${pX + 22}" y="${pY + 127}" fill="${C.win}" font-size="22" font-weight="600">${signed(p.pnl, 2)} USDT` +
+      `<tspan fill="${C.axis}" font-size="15" font-weight="400">  on ${money(hit.margin, 0)} USDT margin</tspan></text>`);
+    headRight = `<text x="${W - 24}" y="66" fill="${C.win}" font-size="17" font-weight="700" text-anchor="end">${hl} · ${signed(p.move, 2)}%</text>`;
+  }
+
   // header
-  const time = new Date(sb.t * 1000).toISOString().slice(0, 16).replace("T", " ");
+  const time = new Date((hit ? bars[n - 1].t : sb.t) * 1000).toISOString().slice(0, 16).replace("T", " ");
+  const hb = hit ? bars[n - 1] : sb;
   s.push(`<text x="${L}" y="40" fill="#fff" font-size="26" font-weight="700">${esc(sig.ticker)}` +
     `<tspan fill="${C.axis}" font-size="18" font-weight="400">  ·  ${esc(sig.tfLabel)}  ·  ${time} UTC</tspan></text>`);
   s.push(`<text x="${L}" y="70" font-size="15">` +
-    `<tspan fill="${C.axis}">O</tspan><tspan fill="${C.text}"> ${fmt(sb.o)}  </tspan>` +
-    `<tspan fill="${C.axis}">H</tspan><tspan fill="${C.text}"> ${fmt(sb.h)}  </tspan>` +
-    `<tspan fill="${C.axis}">L</tspan><tspan fill="${C.text}"> ${fmt(sb.l)}  </tspan>` +
-    `<tspan fill="${C.axis}">C</tspan><tspan fill="${C.text}"> ${fmt(sb.c)}     </tspan>` +
+    `<tspan fill="${C.axis}">O</tspan><tspan fill="${C.text}"> ${fmt(hb.o)}  </tspan>` +
+    `<tspan fill="${C.axis}">H</tspan><tspan fill="${C.text}"> ${fmt(hb.h)}  </tspan>` +
+    `<tspan fill="${C.axis}">L</tspan><tspan fill="${C.text}"> ${fmt(hb.l)}  </tspan>` +
+    `<tspan fill="${C.axis}">C</tspan><tspan fill="${C.text}"> ${fmt(hb.c)}     </tspan>` +
     `<tspan fill="${C.ema20}">EMA20</tspan><tspan fill="${C.ema50}">  EMA50</tspan><tspan fill="${C.ema200}">  EMA200</tspan></text>`);
   s.push(`<text x="${W - 24}" y="40" fill="#fff" font-size="22" font-weight="800" text-anchor="end" letter-spacing="1">VALUE ALPHA CRYPTO</text>`);
-  s.push(`<text x="${W - 24}" y="66" fill="${lblColor}" font-size="17" font-weight="700" text-anchor="end">${sig.side} SIGNAL</text>`);
-  s.push(`<text x="${L}" y="${H - 14}" fill="#5d6577" font-size="13">Chart data: ${esc(sig.exchange)} perpetual · Not financial advice</text>`);
+  s.push(headRight);
+  s.push(`<text x="${L}" y="${H - 14}" fill="#5d6577" font-size="13">Chart data: ${esc(sig.exchange)} perpetual` +
+    `${hit ? ` · PnL is the signal's result on ${money(hit.margin, 0)} USDT margin, no fees` : ""} · Not financial advice</text>`);
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 html,body{margin:0;background:${C.bg}}

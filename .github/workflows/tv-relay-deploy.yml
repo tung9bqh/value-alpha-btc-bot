@@ -117,7 +117,7 @@ jobs:
             [ -n "$BROWSER_TOKEN" ] && echo "Chart images: on" || echo "Chart images: off (add secret CLOUDFLARE_BROWSER_TOKEN)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Test signal (chart) + reply
+      - name: Test signal (chart) + TP1 reply (chart)
         if: steps.check.outputs.ready == 'true' && steps.health.outputs.ok == '1' && inputs.test_chat_id != ''
         env:
           URL: ${{ steps.cf.outputs.url }}
@@ -147,4 +147,5 @@ jobs:
           echo "$r2" | jq -e '.reply_to != null' >/dev/null || { echo "::error::Test failed: $r1 / $r2"; exit 1; }
           if [ -n "$BROWSER_TOKEN" ]; then
             echo "$r1" | jq -e '.photo == true' >/dev/null || { echo "::error::Chart image failed: $(echo "$r1" | jq -r .chart_error)"; exit 1; }
+            echo "$r2" | jq -e '.photo == true' >/dev/null || { echo "::error::TP1 chart failed: $(echo "$r2" | jq -r .chart_error)"; exit 1; }
           fi
