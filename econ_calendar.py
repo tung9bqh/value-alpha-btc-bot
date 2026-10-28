@@ -366,7 +366,23 @@ def main():
     p.add_argument("--wait-until", metavar="HH:MM", help="sleep until this local time before posting")
     p.add_argument("--out", default="econ_calendar.png", help="where to save the image")
     p.add_argument("--as-of", metavar="ISO_TIME", help="preview as if run at this time, e.g. 2026-10-28T05:00Z")
+    p.add_argument("--state-dir", help="bot history folder; with --once-per-day, today's run is recorded there")
+    p.add_argument("--once-per-day", action="store_true",
+                   help="skip if today's calendar was already handled (guards against late/duplicate triggers)")
     args = p.parse_args()
+
+    marker = None
+    if args.state_dir and args.once_per_day and not args.dry_run:
+        marker = os.path.join(args.state_dir, "econ", f"{datetime.now(bot.TZ):%Y-%m-%d}.json")
+        if os.path.exists(marker):
+            print("Today's economic calendar was already handled - skipping.")
+            return 0
+
+    def record(**info):
+        if marker:
+            os.makedirs(os.path.dirname(marker), exist_ok=True)
+            with open(marker, "w") as f:
+                json.dump({"run_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **info}, f)
 
     if args.wait_until:
         bot.wait_until(args.wait_until)
@@ -385,6 +401,7 @@ def main():
         print()
     if not events:
         print("No high-impact USD events in the next 24 hours - nothing to post.")
+        record(events=0)
         return 0
 
     caption = build_caption(events, now_utc, bot.TZ)
@@ -407,6 +424,7 @@ def main():
         ids = [bot.telegram_call(token, "sendPhoto", {"chat_id": chat_id}, {"photo": photo}),
                bot.telegram_call(token, "sendMessage", {"chat_id": chat_id, "text": caption, "parse_mode": "HTML",
                                                         "disable_web_page_preview": "true"})]
+    record(events=len(events), message_ids=ids)
     print(f"Posted message(s) {ids} to {chat_id}: {len(events)} events")
     return 0
 

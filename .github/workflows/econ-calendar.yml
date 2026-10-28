@@ -18,10 +18,10 @@ on:
         default: ""
 
 permissions:
-  contents: write  # dry-run preview on the 'preview-econ' branch
+  contents: write  # run history on the 'state' branch, dry-run preview on 'preview-econ'
 
 concurrency:
-  group: econ-calendar
+  group: btc-bot-state  # shares the 'state' branch with the BTC workflows
   cancel-in-progress: false
 
 jobs:
@@ -35,6 +35,8 @@ jobs:
           python-version: "3.12"
       - name: Install chart library
         run: pip install --quiet matplotlib
+      - name: Load bot history
+        run: bash .github/scripts/state.sh load
       - name: Post economic calendar
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -44,10 +46,15 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
             python econ_calendar.py --dry-run ${{ inputs.as_of && format('--as-of {0}', inputs.as_of) || '' }} | tee preview.txt
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            python econ_calendar.py --wait-until 12:00
+            python econ_calendar.py --wait-until 12:00 --state-dir state --once-per-day
           else
-            python econ_calendar.py
+            python econ_calendar.py --state-dir state --once-per-day
           fi
+      - name: Save bot history
+        if: always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/state.sh save
       - name: Save preview to the 'preview-econ' branch
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run
         shell: bash
