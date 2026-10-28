@@ -10,3 +10,7 @@ workers_dev = true
 CHAT_ID = "@valuealphacrypto"
 # Margin (USDT) the TP replies compute ROI / PnL on.
 RESULT_MARGIN = "2500"
+
+# Workers Logs: console output of each request, viewable in the Cloudflare dashboard.
+[observability]
+enabled = true
