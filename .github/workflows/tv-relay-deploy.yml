@@ -28,6 +28,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       WEBHOOK_SECRET: ${{ secrets.TV_WEBHOOK_SECRET }}
+      # Optional: Cloudflare token with "Browser Rendering - Edit"; without it
+      # entry signals are posted as text only (no chart image).
+      BROWSER_TOKEN: ${{ secrets.CLOUDFLARE_BROWSER_TOKEN }}
       WRANGLER: npx --yes wrangler@4.149.0
     steps:
       - name: Check secrets
@@ -87,7 +90,8 @@ jobs:
         run: |
           $WRANGLER deploy
           jq -n --arg t "$TELEGRAM_BOT_TOKEN" --arg w "$WEBHOOK_SECRET" \
-            '{TELEGRAM_BOT_TOKEN: $t, WEBHOOK_SECRET: $w}' > "$RUNNER_TEMP/secrets.json"
+            --arg a "$CLOUDFLARE_ACCOUNT_ID" --arg b "$BROWSER_TOKEN" \
+            '{TELEGRAM_BOT_TOKEN: $t, WEBHOOK_SECRET: $w, CF_ACCOUNT_ID: $a, BROWSER_TOKEN: $b}' > "$RUNNER_TEMP/secrets.json"
           $WRANGLER secret bulk "$RUNNER_TEMP/secrets.json"
           rm -f "$RUNNER_TEMP/secrets.json"
 
@@ -110,21 +114,37 @@ jobs:
             echo "$URL"
             echo '```'
             [ -n "$ok" ] && echo "Health check: OK" || echo "Health check: not reachable yet (new workers.dev URLs can take up to ~15 minutes, run again later)"
+            [ -n "$BROWSER_TOKEN" ] && echo "Chart images: on" || echo "Chart images: off (add secret CLOUDFLARE_BROWSER_TOKEN)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Test signal + reply
+      - name: Test signal (chart) + reply
         if: steps.check.outputs.ready == 'true' && steps.health.outputs.ok == '1' && inputs.test_chat_id != ''
         env:
           URL: ${{ steps.cf.outputs.url }}
           CHAT: ${{ inputs.test_chat_id }}
         run: |
-          id="TEST-$(date -u +%Y%m%d%H%M%S)"
-          send() {
-            jq -n --arg s "$WEBHOOK_SECRET" --arg c "$CHAT" --arg e "$1" --arg i "$id" --arg t "$2" \
-              '{secret: $s, chat_id: $c, event: $e, id: $i, text: $t}' |
-              curl -sS -X POST -H "Content-Type: application/json" --data @- "$URL"
-          }
-          r1=$(send entry $'🧪 TEST | LONG BTCUSDT.P\n━━━━━━━━━━━━━━\nEntry: 100000\nSL: 99000 (-1%)\nTP1: 100750 (+0.75%)\nTP2: 101200 (+1.2%)')
-          r2=$(send tp1 $'🧪 TEST | ✅ TP1 HIT | BTCUSDT.P\nTake 1/2 profit\nTP1: 100750')
+          # Levels around the last closed BTC 5m candle so the chart looks real.
+          bar=$(curl -sS "https://api.bitget.com/api/v2/mix/market/candles?symbol=BTCUSDT&productType=USDT-FUTURES&granularity=5m&limit=3" |
+            jq -c '.data | sort_by(.[0] | tonumber) | .[-2]')
+          t=$(echo "$bar" | jq -r '.[0] | tonumber / 1000 | floor')
+          read -r entry sl tp1 tp2 slp tp1p tp2p < <(echo "$bar" | jq -r '.[4] | tonumber |
+            [., . * 0.99] as [$e, $s] | ($e - $s) as $r |
+            [$e, $s, $e + 0.75 * $r, $e + 1.2 * $r] | map(. * 10 | round / 10) |
+            . + [1, 0.75, 1.2] | map(tostring) | join(" ")')
+          time=$(date -u -d "@$t" "+%Y-%m-%d %H:%M")
+          id="BTCUSDT.P-L-$(date -u -d "@$t" +%Y%m%d%H%M)-TEST$(date +%S)"
+          text=$(printf '🧪 TEST | 🚀 LONG | BTCUSDT.P\n━━━━━━━━━━━━━━\nEntry: %s\nSL: %s (-%s%%)\nTP1: %s (+%s%%)\nTP2: %s (+%s%%)\nLeverage: x60' \
+            "$entry" "$sl" "$slp" "$tp1" "$tp1p" "$tp2" "$tp2p")
+          r1=$(jq -n --arg s "$WEBHOOK_SECRET" --arg c "$CHAT" --arg i "$id" --arg t "$text" \
+            --arg e "$entry" --arg sl "$sl" --arg a "$tp1" --arg b "$tp2" --arg tm "$time" \
+            '{secret: $s, chat_id: $c, event: "entry", id: $i, text: $t, wait: true, ticker: "BTCUSDT.P",
+              side: "LONG", entry: $e, sl: $sl, tp1: $a, tp2: $b, lev: "60", tf: "5", time: $tm}' |
+            curl -sS -X POST -H "Content-Type: application/json" --data @- "$URL")
+          r2=$(jq -n --arg s "$WEBHOOK_SECRET" --arg c "$CHAT" --arg i "$id" --arg t $'🧪 TEST | ✅ TP1 HIT | BTCUSDT.P\nTake 1/2 profit\nTP1: '"$tp1" \
+            '{secret: $s, chat_id: $c, event: "tp1", id: $i, text: $t, wait: true}' |
+            curl -sS -X POST -H "Content-Type: application/json" --data @- "$URL")
           { echo "### Test to $CHAT"; echo '```'; echo "$r1"; echo "$r2"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           echo "$r2" | jq -e '.reply_to != null' >/dev/null || { echo "::error::Test failed: $r1 / $r2"; exit 1; }
+          if [ -n "$BROWSER_TOKEN" ]; then
+            echo "$r1" | jq -e '.photo == true' >/dev/null || { echo "::error::Chart image failed: $(echo "$r1" | jq -r .chart_error)"; exit 1; }
+          fi
