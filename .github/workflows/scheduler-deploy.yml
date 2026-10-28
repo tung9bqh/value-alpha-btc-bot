@@ -1,0 +1,72 @@
+name: Deploy on-time scheduler (Cloudflare)
+
+# Deploys scheduler/ to Cloudflare Workers. Its Cron Triggers start the bot's
+# workflows on time (GitHub's own schedule can be hours late):
+#   08:30 Vietnam daily plan, 12:00 economic calendar, plan alerts every 5 minutes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scheduler/**"
+      - ".github/workflows/scheduler-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
+      WRANGLER: npx --yes wrangler@4.149.0
+    steps:
+      - name: Check secrets
+        id: check
+        run: |
+          missing=""
+          for s in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_DISPATCH_TOKEN; do
+            [ -n "${!s}" ] || missing="$missing $s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Scheduler not deployed, missing secrets:$missing"
+            { echo "### Scheduler not deployed"; echo "Missing repository secrets:$missing"; } >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the GitHub token can start workflows
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          # A dry-run alert check: proves the token has Actions write access without posting anything.
+          code=$(curl -sS -o /tmp/resp -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $GH_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/plan-alerts.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"dry_run":"true"}}')
+          if [ "$code" != "204" ]; then
+            echo "::error::GH_DISPATCH_TOKEN cannot start workflows (HTTP $code): $(cat /tmp/resp)"
+            echo "Needs a fine-grained token for this repository with 'Actions: Read and write'."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: "22"
+
+      - name: Deploy worker and secret
+        if: steps.check.outputs.ready == 'true'
+        working-directory: scheduler
+        run: |
+          $WRANGLER deploy
+          printf '%s' "$GH_DISPATCH_TOKEN" | $WRANGLER secret put GH_DISPATCH_TOKEN
+          {
+            echo "### Scheduler deployed"
+            echo "Cron (UTC): 01:29 daily plan, 04:59 economic calendar, every 5 min plan alerts."
+          } >> "$GITHUB_STEP_SUMMARY"

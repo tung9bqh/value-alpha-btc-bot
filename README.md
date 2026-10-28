@@ -60,6 +60,17 @@ Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào 
 - Token bot chỉ nằm trong Cloudflare (secret của Worker), không nằm trên TradingView.
 - Code chỉ báo không lưu trong repo (repo public).
 
+## Hẹn giờ đúng giờ bằng Cloudflare (`scheduler/`)
+Lịch `schedule:` của GitHub Actions không đảm bảo đúng giờ (có ngày trễ hàng giờ hoặc bỏ qua), nên một
+**Cloudflare Worker** (Cron Triggers, miễn phí) kích hoạt các workflow đúng giờ:
+08:30 bài plan, 12:00 lịch kinh tế, mỗi 5 phút kiểm tra cảnh báo. Lịch GitHub vẫn giữ làm dự phòng;
+bot chỉ đăng plan / lịch kinh tế **một lần mỗi ngày** nên không bị trùng.
+- Cài: tạo token GitHub tại *Settings → Developer settings → Fine-grained tokens* (chỉ repo này,
+  quyền **Actions: Read and write**), thêm vào secret repo `GH_DISPATCH_TOKEN`, rồi chạy
+  *Actions → Deploy on-time scheduler (Cloudflare) → Run workflow*. Dùng chung `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID` với TradingView relay.
+- Token GitHub chỉ lưu trong secret của repo và secret của Worker.
+
 ## Không ảnh hưởng cộng đồng tiếng Việt
 - Bot **chỉ** gửi tới đúng một chat: secret `TELEGRAM_CHAT_ID_EN` (kênh tiếng Anh).
 - Script chỉ gọi `sendMessage` – **không** gọi `getUpdates` / `setWebhook`, nên nếu bạn
@@ -81,8 +92,8 @@ Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào 
 Từ đó trở đi, workflow tự chạy mỗi ngày.
 
 ## Ghi chú
-- Lịch GitHub thường chạy trễ vài phút, nên job khởi động lúc 08:10 và script tự **đợi đến đúng 08:30**
-  mới lấy dữ liệu và đăng. Nếu GitHub trễ quá 20 phút thì bài sẽ đăng ngay khi job chạy.
+- Lịch dự phòng của GitHub khởi động lúc 08:10 và script tự **đợi đến đúng 08:30**; nếu bài đã được đăng
+  (qua Cloudflare hoặc lượt trước) thì lượt chạy muộn sẽ tự bỏ qua.
 - Repo **public**: GitHub Actions miễn phí không giới hạn phút. Token bot nằm trong *Secrets* nên không bị lộ.
 - Với repo public, GitHub tự tắt lịch chạy nếu repo **không có hoạt động trong 60 ngày** (GitHub sẽ gửi email
   báo trước). Nếu nhận email đó hoặc thấy bot ngừng đăng: vào tab *Actions*, chọn workflow và bấm *Enable*.

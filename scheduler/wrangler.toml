@@ -1,0 +1,10 @@
+# Cloudflare Worker: Cron Triggers that start the bot's GitHub workflows on time.
+# Deployed by .github/workflows/scheduler-deploy.yml (secret GH_DISPATCH_TOKEN).
+name = "va-scheduler"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+workers_dev = false
+
+[triggers]
+# UTC. Keep in sync with JOBS in worker.js.
+crons = ["29 1 * * *", "59 4 * * *", "*/5 * * * *"]
