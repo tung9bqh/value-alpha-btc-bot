@@ -58,7 +58,7 @@ Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào 
 - TradingView: Settings chỉ báo → nhóm *Telegram* → tích **Webhook mode**, điền *Webhook secret* → tạo alert
   *Any alert() function call*, Webhook URL = URL ở trên. Mỗi cặp coin một alert.
 - Token bot chỉ nằm trong Cloudflare (secret của Worker), không nằm trên TradingView.
-- **Ảnh tín hiệu**: bài vào lệnh được đăng dạng ảnh (nến M5 từ Bitget, dự phòng OKX; EMA20/50/200; vùng SL/TP1/TP2)
+- **Ảnh tín hiệu**: bài vào lệnh được đăng dạng ảnh (nến M5 từ Bitget, dự phòng Binance, Bybit, OKX, Hyperliquid, Kraken; EMA20/50/200; vùng SL/TP1/TP2)
   kèm nội dung lệnh làm caption. Ảnh được chụp bằng Cloudflare Browser Rendering: tạo token riêng
   (*Create Custom Token* → quyền **Account · Browser Run · Edit**; tên cũ: Browser Rendering) và lưu vào secret `CLOUDFLARE_BROWSER_TOKEN`,
   rồi chạy lại workflow. Thiếu secret này hoặc vẽ ảnh lỗi thì bài vẫn được đăng dạng chữ như cũ.

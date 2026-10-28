@@ -117,6 +117,15 @@ jobs:
             [ -n "$BROWSER_TOKEN" ] && echo "Chart images: on" || echo "Chart images: off (add secret CLOUDFLARE_BROWSER_TOKEN)"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Candle sources seen from Cloudflare
+        if: steps.check.outputs.ready == 'true' && steps.health.outputs.ok == '1'
+        env:
+          URL: ${{ steps.cf.outputs.url }}
+        run: |
+          diag=$(curl -sS -H "x-secret: $WEBHOOK_SECRET" "$URL/diag")
+          echo "$diag" | jq . || echo "$diag"
+          { echo "### Candle sources (from Cloudflare)"; echo '```'; echo "$diag" | jq . 2>/dev/null || echo "$diag"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Test signal (chart) + TP1 reply (chart)
         if: steps.check.outputs.ready == 'true' && steps.health.outputs.ok == '1' && inputs.test_chat_id != ''
         env:
