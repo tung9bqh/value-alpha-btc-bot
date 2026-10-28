@@ -89,26 +89,31 @@ async function fetchCandles(symbol, tf, signalTime) {
   throw new Error(errors.join("; "));
 }
 
-// HTML -> PNG with the Cloudflare Browser Rendering REST API.
+// HTML -> PNG with the Cloudflare Browser Run (formerly Browser Rendering)
+// REST API. The product was renamed in 2026; try the new path, then the old one.
 async function screenshot(env, html) {
-  const resp = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/browser-rendering/screenshot`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.BROWSER_TOKEN}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        html,
-        viewport: { width: CHART_WIDTH, height: CHART_HEIGHT, deviceScaleFactor: 2 },
-        screenshotOptions: { type: "png" },
-      }),
-      signal: AbortSignal.timeout(20000),
-    },
-  );
-  const type = resp.headers.get("content-type") || "";
-  if (!resp.ok || !type.startsWith("image/")) {
-    throw new Error(`Browser Rendering HTTP ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  const body = JSON.stringify({
+    html,
+    viewport: { width: CHART_WIDTH, height: CHART_HEIGHT, deviceScaleFactor: 2 },
+    screenshotOptions: { type: "png" },
+  });
+  let error;
+  for (const path of ["browser-run", "browser-rendering"]) {
+    const resp = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/${path}/screenshot`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.BROWSER_TOKEN}`, "content-type": "application/json" },
+        body,
+        signal: AbortSignal.timeout(20000),
+      },
+    );
+    const type = resp.headers.get("content-type") || "";
+    if (resp.ok && type.startsWith("image/")) return resp.arrayBuffer();
+    error = `Browser Run (${path}) HTTP ${resp.status}: ${(await resp.text()).slice(0, 200)}`;
+    if (resp.status !== 404) break;
   }
-  return resp.arrayBuffer();
+  throw new Error(error);
 }
 
 async function signalChart(env, body) {

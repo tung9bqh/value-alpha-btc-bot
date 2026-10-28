@@ -28,7 +28,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       WEBHOOK_SECRET: ${{ secrets.TV_WEBHOOK_SECRET }}
-      # Optional: Cloudflare token with "Browser Rendering - Edit"; without it
+      # Optional: Cloudflare token with "Browser Run - Edit" (formerly Browser Rendering); without it
       # entry signals are posted as text only (no chart image).
       BROWSER_TOKEN: ${{ secrets.CLOUDFLARE_BROWSER_TOKEN }}
       WRANGLER: npx --yes wrangler@4.149.0
