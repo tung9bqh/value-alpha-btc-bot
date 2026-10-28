@@ -288,6 +288,22 @@ async function relay(body, env) {
   };
 }
 
+// Last webhooks received and what came of them, shown by /diag. One KV key,
+// newest first; a lost update under concurrent requests only drops a log line.
+async function logRequest(env, entry) {
+  try {
+    const list = JSON.parse((await env.TRADES.get("log:recent")) || "[]");
+    list.unshift({ at: new Date().toISOString(), ...entry });
+    await env.TRADES.put("log:recent", JSON.stringify(list.slice(0, 40)));
+  } catch (e) {
+    console.log("log failed", e);
+  }
+}
+
+const summary = (r) => r.ok
+  ? { ok: true, photo: r.photo, reply_to: r.reply_to, chart_error: r.chart_error || undefined }
+  : { ok: false, error: r.error, chart_error: r.chart_error || undefined };
+
 export async function handle(request, env, ctx) {
   if (request.method === "GET") {
     // /diag (with the webhook secret): which candle sources answer from this Cloudflare location
@@ -303,6 +319,7 @@ export async function handle(request, env, ctx) {
           out[name] = String(e.message || e);
         }
       }
+      out.recent = JSON.parse((await env.TRADES.get("log:recent")) || "[]");
       return json(out);
     }
     return new Response("tv-relay ok\n");
@@ -310,16 +327,22 @@ export async function handle(request, env, ctx) {
   if (request.method !== "POST") return json({ ok: false, error: "method" }, 405);
 
   let body;
+  const raw = await request.text();
   try {
-    body = JSON.parse(await request.text());
+    body = JSON.parse(raw);
   } catch {
+    // e.g. the indicator's Webhook mode is off: TradingView then sends the plain alert text
+    await logRequest(env, { error: "body is not JSON", body: raw.slice(0, 80) });
     return json({ ok: false, error: "body is not JSON" }, 400);
   }
+  const where = { event: body.event, id: body.id, chat: body.chat_id };
   if (!env.WEBHOOK_SECRET || !safeEqual(body.secret, env.WEBHOOK_SECRET)) {
+    await logRequest(env, { ...where, error: "wrong webhook secret" });
     return json({ ok: false, error: "forbidden" }, 403);
   }
   const event = String(body.event || "entry").toLowerCase();
   if (!EVENTS.has(event) || !String(body.text || "").trim() || !String(body.chat_id || env.CHAT_ID || "").trim()) {
+    await logRequest(env, { ...where, error: "need event, text and chat_id" });
     return json({ ok: false, error: "need event, text and chat_id" }, 400);
   }
 
@@ -327,9 +350,12 @@ export async function handle(request, env, ctx) {
   // finish in the background. {"wait": true} (deploy test) waits for the result.
   if (body.wait || !ctx) {
     const result = await relay(body, env);
+    await logRequest(env, { ...where, ...summary(result) });
     return json(result, result.ok ? 200 : 502);
   }
-  ctx.waitUntil(relay(body, env));
+  ctx.waitUntil(relay(body, env)
+    .catch((e) => ({ ok: false, error: String(e.message || e) }))
+    .then((result) => logRequest(env, { ...where, ...summary(result) })));
   return json({ ok: true, queued: true }, 202);
 }
 

@@ -126,6 +126,20 @@ jobs:
           echo "$diag" | jq . || echo "$diag"
           { echo "### Candle sources (from Cloudflare)"; echo '```'; echo "$diag" | jq . 2>/dev/null || echo "$diag"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Requests the worker got (last 24 h, Cloudflare analytics)
+        if: steps.check.outputs.ready == 'true'
+        continue-on-error: true
+        run: |
+          since=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ); until=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          q='query($a:String!,$s:Time!,$u:Time!){viewer{accounts(filter:{accountTag:$a}){workersInvocationsAdaptive(limit:200,filter:{scriptName:"tv-relay",datetime_geq:$s,datetime_leq:$u},orderBy:[datetimeHour_ASC]){sum{requests errors}dimensions{datetimeHour status}}}}}'
+          jq -n --arg q "$q" --arg a "$CLOUDFLARE_ACCOUNT_ID" --arg s "$since" --arg u "$until" \
+            '{query: $q, variables: {a: $a, s: $s, u: $u}}' |
+            curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" \
+              --data @- https://api.cloudflare.com/client/v4/graphql |
+            jq -r 'if .errors then "analytics error: \(.errors|tostring)" else
+              (.data.viewer.accounts[0].workersInvocationsAdaptive[] | "\(.dimensions.datetimeHour)  \(.dimensions.status)  requests=\(.sum.requests) errors=\(.sum.errors)") end' |
+            tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Test signal (chart) + TP1 reply (chart)
         if: steps.check.outputs.ready == 'true' && steps.health.outputs.ok == '1' && inputs.test_chat_id != ''
         env:
