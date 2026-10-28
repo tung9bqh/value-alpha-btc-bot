@@ -149,6 +149,7 @@ jobs:
             '{secret: $s, chat_id: $c, event: "entry", id: $i, text: $t, wait: true, ticker: "BTCUSDT.P",
               side: "LONG", entry: $e, sl: $sl, tp1: $a, tp2: $b, lev: "60", tf: "5", time: $tm}' |
             curl -sS -X POST -H "Content-Type: application/json" --data @- "$URL")
+          sleep 12  # screenshots are rate limited on the free plan
           r2=$(jq -n --arg s "$WEBHOOK_SECRET" --arg c "$CHAT" --arg i "$id" --arg t $'🧪 TEST | ✅ TP1 HIT | BTCUSDT.P\nTake 1/2 profit\nTP1: '"$tp1" \
             '{secret: $s, chat_id: $c, event: "tp1", id: $i, text: $t, wait: true}' |
             curl -sS -X POST -H "Content-Type: application/json" --data @- "$URL")

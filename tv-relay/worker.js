@@ -147,6 +147,20 @@ async function screenshot(env, html) {
     screenshotOptions: { type: "png" },
   });
   let error;
+  // The free plan allows only a few screenshots a minute: on 429 wait and retry
+  // (twice), which also spaces out signals of several pairs on the same candle.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 11000));
+    const png = await screenshotOnce(env, body);
+    if (png.image) return png.image;
+    error = png.error;
+    if (png.status !== 429) break;
+  }
+  throw new Error(error);
+}
+
+async function screenshotOnce(env, body) {
+  let error, status;
   for (const path of ["browser-run", "browser-rendering"]) {
     const resp = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/${path}/screenshot`,
@@ -154,15 +168,16 @@ async function screenshot(env, html) {
         method: "POST",
         headers: { Authorization: `Bearer ${env.BROWSER_TOKEN}`, "content-type": "application/json" },
         body,
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(12000),
       },
     );
     const type = resp.headers.get("content-type") || "";
-    if (resp.ok && type.startsWith("image/")) return resp.arrayBuffer();
+    if (resp.ok && type.startsWith("image/")) return { image: await resp.arrayBuffer() };
+    status = resp.status;
     error = `Browser Run (${path}) HTTP ${resp.status}: ${(await resp.text()).slice(0, 200)}`;
     if (resp.status !== 404) break;
   }
-  throw new Error(error);
+  return { error, status };
 }
 
 // Trade details from the indicator's entry alert, kept in KV for the TP replies.
