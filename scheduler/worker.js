@@ -11,9 +11,9 @@ const REPO = "tung9bqh/value-alpha-btc-bot";
 // The retry slots re-run a job that failed (exchange/feed hiccup, runner error); both
 // workflows post at most once per day, so a retry after a successful post does nothing.
 const JOBS = {
-  "29 1 * * *": [["btc-daily.yml", { dry_run: "false" }]],      // 08:30 Vietnam: daily plan + recap
+  "30 1 * * *": [["btc-daily.yml", { dry_run: "false" }]],      // 08:30 Vietnam: daily plan + recap (posts ~08:30:20)
   "40,55 1 * * *": [["btc-daily.yml", { dry_run: "false" }]],   // retries at 08:40 and 08:55
-  "59 4 * * *": [["econ-calendar.yml", { dry_run: "false" }]],  // 12:00 Vietnam: economic calendar
+  "0 5 * * *": [["econ-calendar.yml", { dry_run: "false" }]],   // 12:00 Vietnam: economic calendar
   "10,25 5 * * *": [["econ-calendar.yml", { dry_run: "false" }]], // retries at 12:10 and 12:25
   "*/5 * * * *": [["plan-alerts.yml", { dry_run: "false" }]],   // plan alerts every 5 minutes
 };

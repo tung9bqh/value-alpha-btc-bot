@@ -68,5 +68,5 @@ jobs:
           printf '%s' "$GH_DISPATCH_TOKEN" | $WRANGLER secret put GH_DISPATCH_TOKEN
           {
             echo "### Scheduler deployed"
-            echo "Cron (UTC): 01:29 daily plan, 04:59 economic calendar, every 5 min plan alerts."
+            echo "Cron (UTC): 01:30 daily plan, 05:00 economic calendar (retries +10/+25 min), every 5 min plan alerts."
           } >> "$GITHUB_STEP_SUMMARY"
