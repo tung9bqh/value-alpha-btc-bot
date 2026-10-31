@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-31",
+  "posted_at": 1793410288,
+  "direction": "SHORT",
+  "lo": 77500,
+  "hi": 77750,
+  "entry": 77625.0,
+  "sl": 78556.5,
+  "tp1": 76693.5,
+  "tp2": 76227.75,
+  "cancel": 78556.5,
+  "message_ids": [
+    459,
+    460
+  ],
+  "alerts_sent": [
+    "entry@1793447100"
+  ],
+  "recap_sent": false,
+  "result": null
+}
