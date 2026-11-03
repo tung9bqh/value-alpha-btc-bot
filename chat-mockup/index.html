@@ -465,6 +465,7 @@ button:disabled{opacity:.45;cursor:default}
   <table>
     <tr><td class="ic">↶</td><td><b>Hoàn tác / Làm lại</b>Quay lại hoặc làm lại thao tác vừa rồi (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z). Nhớ 50 bước cho mỗi cuộc chat.</td></tr>
     <tr><td class="ic">⬇</td><td><b>Xuất ảnh PNG</b>Chọn ở ô bên cạnh: “phần đang hiển thị” (đúng như đang thấy), “toàn bộ – chia nhiều ảnh” (giữ tỷ lệ khung, ảnh sau nối tiếp ảnh trước, không cắt đôi tin nhắn) hoặc “toàn bộ – 1 ảnh dài”. Trên điện thoại, nhấn giữ ảnh để lưu.</td></tr>
+    <tr><td class="ic">👤</td><td><b>Nhóm hay cá nhân</b>Tab “Giao diện &amp; dữ liệu” → “Loại cuộc trò chuyện”. Cá nhân (1-1): giống Telegram, tin của người kia không hiện tên và avatar bên trái, avatar trên thanh tiêu đề là avatar của người chat cùng. Nhóm: hiện tên và avatar người gửi.</td></tr>
     <tr><td class="ic">🔍</td><td><b>Kích thước khung xem</b>Mặc định “Vừa màn hình”: khung chat tự thu nhỏ để thấy trọn cả khung mà không phải cuộn; ô soạn tin nằm ngay bên phải. Có thể chọn 100%/90%/80%… Chỉ ảnh hưởng phần xem trước, ảnh xuất luôn đúng kích thước gốc.</td></tr>
     <tr><td class="ic">⤒</td><td><b>Thanh cuộn</b>Vạch mảnh ở mép phải khung chat, chỉ hiện khi rê chuột vào khung hoặc khi đang cuộn. Kéo vạch hoặc bấm vào thanh để nhảy tới vị trí; ⤒ lên đầu, ⤓ xuống cuối. Thanh này không xuất hiện trong ảnh xuất.</td></tr>
     <tr><td class="ic">➤</td><td><b>Ô soạn tin</b>Chọn người gửi, chọn loại tin, chỉnh giờ rồi nhấn Gửi (hoặc Enter). Shift+Enter để xuống dòng.</td></tr>
@@ -527,7 +528,7 @@ function sample(){
     chat:{title:'Special 1:1 with Emilio Nuñez',subtitle:'3 members',back:'65',avatarText:'S',avatarColor:'#4caf50',avatarImg:'',
       showNames:true,showAvatars:true,out1:'#9a5cf2',out2:'#5d6ef6',inColor:'#26262b',bgColor:'#08080b',
       pattern:true,patternColor:'#5b4596',bgImg:'',width:390,height:844,fontSize:17,
-      theme:'dark',outText:'#ffffff',inText:'#ffffff'},
+      theme:'dark',outText:'#ffffff',inText:'#ffffff',mode:'group',peer:''},
     people:[
       {id:'me',name:'Money0x Mr',color:'#ffffff',badge:'',avatar:''},
       {id:'p1',name:'Leite Mauricio',color:'#6ec6e8',badge:'★',avatar:''}
@@ -555,6 +556,8 @@ function sanitize(d){
   const def=sample().chat, c=Object.assign({},def,d.chat||{});
   ['avatarColor','out1','out2','inColor','bgColor','patternColor','outText','inText'].forEach(k=>{if(!okColor(c[k])) c[k]=def[k]});
   if(c.theme!=='light') c.theme='dark';
+  if(c.mode!=='private') c.mode='group';
+  c.peer=okId(c.peer)?c.peer:'';
   ['avatarImg','bgImg'].forEach(k=>{if(!okImg(c[k])) c[k]=''});
   ['width','height','fontSize'].forEach(k=>{c[k]=Math.min(4000,Math.max(10,+c[k]||def[k]))});
   ['title','subtitle','back','avatarText'].forEach(k=>{c[k]=String(c[k]??'')});
@@ -688,12 +691,15 @@ function patternURL(c){
 }
 
 /* ---------- render chat screen ---------- */
+/* Chat cá nhân (1-1): người chat cùng = người được chọn, hoặc người đầu tiên không phải “bạn” */
+const peerPerson=()=>S.people.find(p=>p.id===S.chat.peer&&p.id!=='me')||S.people.find(p=>p.id!=='me');
+const isPrivate=()=>S.chat.mode==='private';
 function renderHeader(){
-  const c=S.chat;
+  const c=S.chat, pr=isPrivate()&&peerPerson();
   $('#hdr').innerHTML=`
     <div class="pill back"><svg width="12" height="20" viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>${c.back!==''?`<span class="cnt">${esc(c.back)}</span>`:''}</div>
     <div class="pill ttl"><div class="t">${esc(c.title)}</div>${c.subtitle?`<div class="s">${esc(c.subtitle)}</div>`:''}</div>
-    <div class="hav" style="background:linear-gradient(color-mix(in srgb,${c.avatarColor} 70%,white),${c.avatarColor})">${c.avatarImg?`<img src="${c.avatarImg}" alt="">`:esc(c.avatarText)}</div>`;
+    ${pr?`<div class="hav" style="border:none">${avatarHTML(pr,52)}</div>`:`<div class="hav" style="background:linear-gradient(color-mix(in srgb,${c.avatarColor} 70%,white),${c.avatarColor})">${c.avatarImg?`<img src="${c.avatarImg}" alt="">`:esc(c.avatarText)}</div>`}`;
 }
 /* ---------- Huy hiệu sau tên: 10 loại hay gặp trên Telegram ---------- */
 const verSVG=(fill,size=17)=>`<svg class="bdg-svg lver" width="${size}" height="${size}" viewBox="0 0 24 24"><path fill="${fill}" d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -872,9 +878,9 @@ function renderMsgs(){
     const same=a=>a&&a.type!=='date'&&a.from===m.from;
     const first=!same(ms[i-1]), last=!same(ms[i+1]);
     const out=m.from==='me', p=person(m.from);
-    const showAv=!out&&c.showAvatars;
+    const showAv=!out&&c.showAvatars&&c.mode!=='private';
     const meta=metaHTML(m,out), spacer=`<span class="spacer">${meta}</span>`;
-    const nameH=(!out&&first&&c.showNames)?`<div class="name" style="color:${p.color}">${esc(p.name)}${p.badge?` ${badgeHTML(p.badge)}`:''}</div>`:'';
+    const nameH=(!out&&first&&c.showNames&&c.mode!=='private')?`<div class="name" style="color:${p.color}">${esc(p.name)}${p.badge?` ${badgeHTML(p.badge)}`:''}</div>`:'';
     const reacts=reactsHTML(m);
     const tail=last?'<span class="tail"></span>':'';
     let body='';
@@ -1246,6 +1252,7 @@ pBox.addEventListener('input',e=>{
   const p=S.people.find(x=>x.id===e.target.closest('[data-pid]').dataset.pid);
   const old=p.name; p[k]=e.target.value;
   if(k==='name') S.messages.forEach(m=>{if(m.replyName===old) m.replyName=p.name});
+  if(k==='name') renderChatForm();
   if(k==='badge') e.target.closest('[data-pid]').querySelectorAll('[data-pbadge]').forEach(x=>x.classList.toggle('on',x.dataset.pbadge===p.badge&&p.badge!==''));
   renderPhone();renderList();renderCompose();save();
 });
@@ -1270,22 +1277,23 @@ pBox.addEventListener('click',e=>{
     S.messages=S.messages.filter(m=>m.from!==p.id||m.type==='date');S.people=S.people.filter(x=>x!==p);
     if(composeFrom===p.id) composeFrom='me';
   }
-  renderPeople();renderPhone();renderList();renderForm();renderCompose();save();
+  renderPeople();renderPhone();renderList();renderForm();renderCompose();renderChatForm();save();
 });
 $('#addPerson').onclick=()=>{
   const n=S.people.length;
   S.people.push({id:uid(),name:'Người '+n,color:PALETTE[(n-1)%PALETTE.length],badge:'',avatar:''});
-  renderPeople();renderCompose();renderForm();save();
+  renderPeople();renderCompose();renderForm();renderChatForm();save();
 };
 
 /* ---------- chat settings ---------- */
 const CF=[
   ['Thanh tiêu đề'],
+  ['mode','Loại cuộc trò chuyện','select',[['group','👥 Nhóm'],['private','👤 Cá nhân (chat 1-1)']]],['peer','Người chat cùng (avatar trên tiêu đề)','peer'],
   ['title','Tên nhóm / người chat','text'],['subtitle','Dòng phụ (vd: 3 members, online, last seen recently)','text'],
   ['back','Số trên nút Back (để trống để ẩn)','text'],['avatarText','Chữ trên avatar','text'],
   ['avatarColor','Màu avatar','color'],['avatarImg','Ảnh avatar nhóm','file'],
   ['Tin nhắn'],
-  ['theme','Chế độ (thanh tiêu đề, chữ phụ)','select'],['fontSize','Cỡ chữ (px)','number'],
+  ['theme','Chế độ (thanh tiêu đề, chữ phụ)','select',[['dark','🌙 Tối'],['light','☀️ Sáng']]],['fontSize','Cỡ chữ (px)','number'],
   ['showNames','Hiện tên người gửi (chat nhóm)','check'],['showAvatars','Hiện avatar người gửi bên trái','check'],
   ['out1','Bong bóng của bạn – màu trên','color'],['out2','Bong bóng của bạn – màu dưới','color'],
   ['outText','Chữ trong bong bóng của bạn','color'],['inText','Chữ trong bong bóng người khác','color'],
@@ -1298,11 +1306,20 @@ const CF=[
 function renderChatForm(){
   const c=S.chat;let h='',grid=[];
   const flush=()=>{if(grid.length){h+=`<div class="grid2">${grid.join('')}</div>`;grid=[]}};
-  CF.forEach(([k,l,t])=>{
+  const pv=c.mode==='private', hideInPrivate=['avatarText','avatarColor','avatarImg','showNames','showAvatars'];
+  CF.forEach(([k,l,t,o])=>{
     if(!l){flush();h+=`<div class="sect">${k}</div>`;return}
+    if(pv&&hideInPrivate.includes(k)) return;
+    if(t==='peer'){
+      if(!pv) return;
+      const others=S.people.filter(p=>p.id!=='me');
+      grid.push(`<label>${l}<select data-c="peer">${opts(others.map(p=>[p.id,p.name||'(chưa đặt tên)']),peerPerson()?.id||'')}</select></label>`);
+      flush();h+=`<p class="hint" style="margin:-2px 0 0">Chat 1-1 giống Telegram: tin của người kia không hiện tên và avatar bên trái; avatar trên thanh tiêu đề lấy theo người chat cùng (đổi ảnh ở tab “Người chat”).</p>`;
+      return;
+    }
     if(t==='text'){flush();h+=`<label>${l}<input data-c="${k}" value="${esc(c[k])}"></label>`}
     else if(t==='color') grid.push(`<label>${l}<input type="color" data-c="${k}" value="${esc(c[k])}"></label>`);
-    else if(t==='select') grid.push(`<label>${l}<select data-c="${k}">${opts([['dark','🌙 Tối'],['light','☀️ Sáng']],c[k])}</select></label>`);
+    else if(t==='select') grid.push(`<label>${l}<select data-c="${k}">${opts(o,c[k])}</select></label>`);
     else if(t==='number') grid.push(`<label>${l}<input type="number" data-c="${k}" value="${esc(c[k])}"></label>`);
     else if(t==='check') grid.push(`<label class="chk" style="padding-top:4px"><input type="checkbox" data-c="${k}"${c[k]?' checked':''}> ${l}</label>`);
     else if(t==='file') grid.push(`<div><span class="hint" style="display:block;margin:0 0 4px">${l}</span><div class="row-btns" style="margin:0"><label class="file">Chọn ảnh<input type="file" accept="image/*" data-cfile="${k}"></label>${k==='avatarImg'?`<button data-crand="${k}" title="Tạo avatar ngẫu nhiên">🎲 Ngẫu nhiên</button>`:''}${c[k]?`<button data-cclear="${k}">Xoá</button>`:''}</div></div>`);
@@ -1314,6 +1331,7 @@ $('#chatForm').addEventListener('input',e=>{
   const k=e.target.dataset.c;if(!k) return;
   S.chat[k]=e.target.type==='checkbox'?e.target.checked:e.target.type==='number'?+e.target.value:e.target.value;
   renderPhone();renderPresets();save();
+  if(k==='mode') renderChatForm();
 });
 
 /* ---------- Bộ màu có sẵn ---------- */
@@ -1640,7 +1658,7 @@ $('#impJson').onchange=e=>{
 /* ---------- Nhiều cuộc chat ---------- */
 function blankChat(){
   const d=sample();
-  d.chat.title='Cuộc trò chuyện mới';d.chat.subtitle='online';d.chat.avatarText='C';d.chat.back='';
+  d.chat.title='Người 1';d.chat.subtitle='online';d.chat.avatarText='C';d.chat.back='';d.chat.mode='private';
   d.people=[{id:'me',name:'Tôi',color:'#ffffff',badge:'',avatar:''},{id:uid(),name:'Người 1',color:PALETTE[0],badge:'',avatar:''}];
   d.messages=[];return d;
 }
