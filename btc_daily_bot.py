@@ -202,14 +202,23 @@ def make_setup(direction, lo, hi):
             "tp1": entry + side * TP_RR[0] * risk, "tp2": entry + side * TP_RR[1] * risk}
 
 
+ZONE_MIN_DIST, ZONE_MAX_DIST = 0.0015, 0.006  # zone centre 0.15%-0.6% away from price
+ZONE_WIDTH = 0.003
+
+
 def build_zone(data, sig, price, direction):
-    """Primary setup: retrace into the nearest confluence zone, plus its cancel level."""
+    """Primary setup: a shallow retrace into the nearest confluence zone, plus its cancel level.
+
+    The zone stays close to price: with a 1.2% stop and TP1 at 1R, a zone much further away
+    puts TP1 next to the current price, and the move often reaches TP1 before any retrace.
+    """
     side = 1 if direction == "LONG" else -1
-    width = round_to(price * 0.0035, 50) or 50
+    width = round_to(price * ZONE_WIDTH, 50) or 50
     levels = candidate_levels(data, sig)
 
     # Primary: nearest level on the pullback side (resistance for shorts, support for longs).
-    pullback_side = sorted([lv for lv in levels if 0.001 < side * (price - lv[1]) / price < 0.02],
+    pullback_side = sorted([lv for lv in levels
+                            if ZONE_MIN_DIST <= side * (price - lv[1]) / price <= ZONE_MAX_DIST],
                            key=lambda lv: side * (price - lv[1]))
     if pullback_side:
         center = pullback_side[0][1]
@@ -220,9 +229,9 @@ def build_zone(data, sig, price, direction):
         if side == 1 and hi >= price:
             hi, lo = round_to(price * 0.999, 50) - 50, round_to(price * 0.999, 50) - 50 - width
         reasons = [name for name, v in levels if lo - width * 0.5 <= v <= hi + width * 0.5]
-    else:
-        base = price * (1 - side * 0.003)
-        lo, hi = sorted((round_to(base, 50), round_to(base - side * width, 50)))
+    else:  # no level close enough: a shallow pullback zone right next to price
+        near = round_to(price * (1 - side * ZONE_MIN_DIST), 50)
+        lo, hi = sorted((near, near - side * width))
         reasons = []
     primary = make_setup(direction, lo, hi)
     recent = data["H1"][-24:]
