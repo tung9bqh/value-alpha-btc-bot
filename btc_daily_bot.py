@@ -47,10 +47,10 @@ USER_AGENT = "ValueAlphaBTCBot/3.0"
 
 # Display name -> (Bitget granularity, OKX bar, weight in the daily decision)
 TIMEFRAMES = {
-    "H4": ("4H", "4H", 0.40),
-    "H1": ("1H", "1H", 0.30),
-    "M30": ("30m", "30m", 0.17),
-    "M15": ("15m", "15m", 0.13),
+    "H4": ("4H", "4H", 0.20),
+    "H1": ("1H", "1H", 0.35),
+    "M30": ("30m", "30m", 0.25),
+    "M15": ("15m", "15m", 0.20),
 }
 CAPTION_LIMIT = 1024  # Telegram limit for photo captions (visible characters)
 

@@ -20,7 +20,7 @@ khung *Entry Conditions* (3 điều kiện) và cảnh báo *Don't FOMO*.
 - Disclaimer
 
 Dữ liệu: hợp đồng vĩnh cửu **BTCUSDT.P** trên **Bitget** (dự phòng: OKX `BTC-USDT-SWAP`).
-Không cần API key. Trọng số quyết định LONG/SHORT: H4 40%, H1 30%, M30 17%, M15 13%.
+Không cần API key. Trọng số quyết định LONG/SHORT: H4 20%, H1 35%, M30 25%, M15 20%.
 
 Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_POOL` (danh sách coin để chọn ngẫu nhiên).
 
