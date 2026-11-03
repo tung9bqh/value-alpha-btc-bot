@@ -39,6 +39,16 @@ legend{color:var(--ui-mute);font-size:12px;padding:0 4px}
 
 .app{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;justify-content:center;padding:20px 16px 40px}
 .stage{display:flex;flex-direction:column;gap:12px;align-items:center;max-width:100%}
+.stage-top{display:flex;flex-direction:column;gap:10px;align-items:center}
+.work{display:flex;gap:16px;align-items:flex-start;justify-content:center;flex-wrap:wrap;max-width:100%}
+.dock{flex:0 1 400px;min-width:300px;max-width:100%;display:flex;flex-direction:column;gap:12px}
+.work>.devwrap{flex:none}
+.dock .composer,.dock .lcomposer{max-width:none}
+@media (min-width:1240px){
+  .app{flex-wrap:nowrap}
+  .stage{position:sticky;top:0;max-height:100vh;overflow-y:auto;padding-bottom:12px;scrollbar-width:thin}
+  .work{flex-wrap:nowrap}
+}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .device{border-radius:30px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 0 1px #2a2c35;max-width:100%}
 .editor{flex:1 1 380px;max-width:540px;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:14px}
@@ -294,6 +304,7 @@ button:disabled{opacity:.45;cursor:default}
 <body>
 <div class="app">
   <section class="stage">
+    <div class="stage-top">
     <div class="vswitch" role="tablist" aria-label="Chọn màn hình">
       <button data-v="chat" class="on" role="tab">💬 Màn hình chat</button>
       <button data-v="list" role="tab">📋 Danh sách chat</button>
@@ -308,7 +319,14 @@ button:disabled{opacity:.45;cursor:default}
       </select>
       <button class="primary" id="btnPng">⬇ Xuất ảnh PNG</button>
       <button id="btnHelp" title="Giải thích các nút">❓ Hướng dẫn</button>
+      <select id="zoomSel" style="width:auto" title="Kích thước khung xem trước – không ảnh hưởng ảnh xuất" aria-label="Kích thước khung xem trước">
+        <option value="fit">🔍 Vừa màn hình</option>
+        <option value="1">🔍 100%</option><option value="0.9">🔍 90%</option><option value="0.8">🔍 80%</option>
+        <option value="0.7">🔍 70%</option><option value="0.6">🔍 60%</option>
+      </select>
     </div>
+    </div>
+    <div class="work">
     <div class="devwrap">
       <div class="device"><div id="screen">
         <div id="scroller"><div id="msgs"></div></div>
@@ -322,6 +340,7 @@ button:disabled{opacity:.45;cursor:default}
       </div>
     </div>
 
+    <div class="dock">
     <div class="lcomposer" id="lcomposer" hidden>
       <button class="primary" id="addL2">＋ Thêm cuộc trò chuyện vào danh sách</button>
       <div class="lbulk">
@@ -364,6 +383,8 @@ button:disabled{opacity:.45;cursor:default}
         <button id="cNow" title="Lấy giờ hiện tại">Bây giờ</button>
         <label class="creply" id="cReplyWrap"><input type="checkbox" id="cReply"> ↩ Trả lời tin đang chọn</label>
       </div>
+    </div>
+    </div>
     </div>
   </section>
 
@@ -444,6 +465,7 @@ button:disabled{opacity:.45;cursor:default}
   <table>
     <tr><td class="ic">↶</td><td><b>Hoàn tác / Làm lại</b>Quay lại hoặc làm lại thao tác vừa rồi (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z). Nhớ 50 bước cho mỗi cuộc chat.</td></tr>
     <tr><td class="ic">⬇</td><td><b>Xuất ảnh PNG</b>Chọn ở ô bên cạnh: “phần đang hiển thị” (đúng như đang thấy), “toàn bộ – chia nhiều ảnh” (giữ tỷ lệ khung, ảnh sau nối tiếp ảnh trước, không cắt đôi tin nhắn) hoặc “toàn bộ – 1 ảnh dài”. Trên điện thoại, nhấn giữ ảnh để lưu.</td></tr>
+    <tr><td class="ic">🔍</td><td><b>Kích thước khung xem</b>Mặc định “Vừa màn hình”: khung chat tự thu nhỏ để thấy trọn cả khung mà không phải cuộn; ô soạn tin nằm ngay bên phải. Có thể chọn 100%/90%/80%… Chỉ ảnh hưởng phần xem trước, ảnh xuất luôn đúng kích thước gốc.</td></tr>
     <tr><td class="ic">⤒</td><td><b>Thanh cuộn</b>Vạch mảnh ở mép phải khung chat, chỉ hiện khi rê chuột vào khung hoặc khi đang cuộn. Kéo vạch hoặc bấm vào thanh để nhảy tới vị trí; ⤒ lên đầu, ⤓ xuống cuối. Thanh này không xuất hiện trong ảnh xuất.</td></tr>
     <tr><td class="ic">➤</td><td><b>Ô soạn tin</b>Chọn người gửi, chọn loại tin, chỉnh giờ rồi nhấn Gửi (hoặc Enter). Shift+Enter để xuống dòng.</td></tr>
     <tr><td class="ic">💬</td><td><b>Văn bản</b>Gõ tin nhắn bình thường. Nút 😊 trong ô gõ mở bảng emoji để chèn vào câu.</td></tr>
@@ -809,6 +831,22 @@ function renderListRows(){
       `<div class="l2"><span class="lt${acc?' acc':''}">${it.prefix?`<span class="lpre">${esc(it.prefix)}</span>`:''}${pre}<span class="ltx">${esc(lPreviewText(it))}</span></span>${right2}</div></div></div>`;
   }).join('');
 }
+/* Thu nhỏ khung XEM TRƯỚC cho vừa màn hình (ảnh xuất vẫn đúng kích thước gốc) */
+let zoomPref='fit', expFlag=false;
+try{zoomPref=localStorage.getItem('cms:zoom')||'fit'}catch(e){}
+function fitPreview(){
+  const dev=$('.device'), wrap=$('.devwrap'), scr=$('#screen');if(!dev||!scr) return;
+  const W=scr.offsetWidth, H=scr.offsetHeight;
+  let z=1;
+  if(!expFlag){
+    if(zoomPref==='fit'){
+      if(innerWidth>=900){const used=($('.stage-top')?.offsetHeight||0)+60;z=Math.min(1,Math.max(.45,(innerHeight-used)/H))}
+    }else z=Math.min(1,Math.max(.3,+zoomPref||1));
+  }
+  const on=z<0.999;
+  dev.style.transformOrigin='top left';dev.style.transform=on?`scale(${z})`:'';dev.style.maxWidth=on?'none':'';dev.style.width=on?W+'px':'';
+  wrap.style.width=on?W*z+'px':'';wrap.style.height=on?H*z+'px':'';
+}
 function applyScreenVars(){
   const c=S.chat, scr=$('#screen'), L=S.list, lm=view==='list';
   scr.classList.toggle('listmode',lm);scr.classList.toggle('withhdr',lm&&L.showHeader);
@@ -820,6 +858,7 @@ function applyScreenVars(){
   scr.style.setProperty('--in',c.inColor);scr.style.setProperty('--chatbg',c.bgColor);
   scr.style.setProperty('--txt-out',c.outText);scr.style.setProperty('--txt-in',c.inText);
   scr.classList.toggle('light',c.theme==='light');
+  fitPreview();
   if(lm){scr.style.setProperty('--chatbg',L.bg);scr.style.setProperty('--pat','none')}
   else if(c.bgImg){scr.style.setProperty('--pat',`url("${c.bgImg}")`);scr.style.setProperty('--patsize','cover')}
   else if(c.pattern){scr.style.setProperty('--pat',patternURL(c.patternColor));scr.style.setProperty('--patsize','260px')}
@@ -865,10 +904,10 @@ function renderPhone(keep='auto'){
   updateGrad();placeQbar();updRail();
 }
 function updateGrad(){
-  const scr=$('#screen'), top=scr.getBoundingClientRect().top;
+  const scr=$('#screen'), sr=scr.getBoundingClientRect(), top=sr.top, f=(sr.height/scr.offsetHeight)||1; // f = hệ số thu nhỏ khung xem
   $$('#msgs .out .bubble').forEach(b=>{
     const r=b.getBoundingClientRect();
-    b.style.setProperty('--gy',(r.top-top)+'px');b.style.setProperty('--bh',r.height+'px');
+    b.style.setProperty('--gy',(r.top-top)/f+'px');b.style.setProperty('--bh',r.height/f+'px');
   });
 }
 let railT;
@@ -876,7 +915,9 @@ $('#scroller').addEventListener('scroll',()=>{
   updateGrad();placeQbar();updRail();
   const r=$('#rail');r.classList.add('show');clearTimeout(railT);railT=setTimeout(()=>r.classList.remove('show'),1200);
 },{passive:true});
-window.addEventListener('resize',()=>{updateGrad();placeQbar();updRail()});
+window.addEventListener('resize',()=>{fitPreview();updateGrad();placeQbar();updRail()});
+$('#zoomSel').value=zoomPref;
+$('#zoomSel').onchange=e=>{zoomPref=e.target.value;try{localStorage.setItem('cms:zoom',zoomPref)}catch(_){}fitPreview();updateGrad();placeQbar();updRail()};
 
 /* ---------- Thanh cuộn cạnh khung chat ---------- */
 function updRail(){
@@ -1697,6 +1738,7 @@ $('#btnPng').onclick=async()=>{
   const rows=[...inner.children], o={pixelRatio:3,cacheBust:true,skipFonts:true}, shots=[];
   const snap=async()=>{updateGrad();if(!shots.length) await htmlToImage.toPng(scr,o);shots.push(await htmlToImage.toPng(scr,o))}; // lần đầu chạy 2 lần để nạp ảnh (Safari)
   btn.disabled=true;btn.textContent='Đang xuất…';
+  expFlag=true;fitPreview();
   scr.classList.add('exporting');sc.style.overflow='hidden';sc.scrollTop=0;
   try{
     if(mode==='long'){scr.style.setProperty('--H',Math.max(+S.chat.height||844,inner.offsetHeight)+'px');await snap()}
@@ -1714,7 +1756,7 @@ $('#btnPng').onclick=async()=>{
     showShots(shots);
   }catch(err){alert('Lỗi xuất ảnh: '+(err&&err.message||err))}
   finally{
-    rows.forEach(r=>{r.style.visibility=''});inner.style.transform='';sc.style.overflow='';applyScreenVars();
+    expFlag=false;rows.forEach(r=>{r.style.visibility=''});inner.style.transform='';sc.style.overflow='';applyScreenVars();fitPreview();
     sc.scrollTop=st;scr.classList.remove('exporting');updateGrad();updRail();btn.disabled=false;btn.textContent='⬇ Xuất ảnh PNG';
   }
 };
