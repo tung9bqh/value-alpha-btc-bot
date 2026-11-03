@@ -112,13 +112,17 @@ button:disabled{opacity:.45;cursor:default}
 .pv i:first-child{align-self:flex-end}
 .devrow{display:flex;gap:8px;align-items:stretch;max-width:100%}
 .devwrap{position:relative;max-width:100%}
-.rail{width:30px;flex:none;display:flex;flex-direction:column;gap:4px;padding:6px 0;user-select:none}
-.rail button{padding:5px 0;justify-content:center;font-size:13px;border-radius:8px}
-.track{flex:1;position:relative;background:var(--ui-input);border:1px solid var(--ui-line);border-radius:15px;cursor:pointer;touch-action:none;min-height:60px}
-.thumb{position:absolute;left:3px;right:3px;top:0;background:#4a4e60;border-radius:12px;cursor:grab;touch-action:none}
+.rail{position:absolute;top:84px;bottom:14px;right:3px;width:16px;z-index:15;display:flex;flex-direction:column;align-items:center;gap:5px;
+  opacity:0;pointer-events:none;transition:opacity .25s;user-select:none}
+.devwrap:hover .rail,.rail.show,.rail:focus-within{opacity:1;pointer-events:auto}
+.rail.off{display:none}
+.rail button{width:16px;height:16px;padding:0;border:none;border-radius:50%;font-size:9px;line-height:1;justify-content:center;background:rgba(40,42,52,.9);color:#fff}
+.rail button:hover{background:var(--ui-acc)}
+.track{flex:1;width:6px;position:relative;background:rgba(255,255,255,.1);border-radius:3px;cursor:pointer;touch-action:none;transition:width .15s}
+.rail:hover .track{width:10px}
+.thumb{position:absolute;left:0;right:0;top:0;background:rgba(170,175,195,.8);border-radius:5px;cursor:grab;touch-action:none}
 .thumb:hover,.thumb.drag{background:var(--ui-acc)}
 .thumb.drag{cursor:grabbing}
-.rail.off .thumb{background:#2e3140;cursor:default}
 #qbar{position:absolute;z-index:20;display:flex;flex-direction:column;gap:4px;padding:6px;background:#17181e;
   border:1px solid var(--ui-line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:calc(100% - 8px)}
 #qbar[hidden]{display:none}
@@ -143,7 +147,7 @@ button:disabled{opacity:.45;cursor:default}
 
 /* ================= CHAT SCREEN ================= */
 #screen{--pill-bg:rgba(32,32,36,.94);--pill-txt:#fff;--pill-line:rgba(255,255,255,.07);--hdr-fade:rgba(0,0,0,.6);
-  position:relative;width:min(var(--W),calc(100vw - 70px));height:var(--H);overflow:hidden;color:#fff;
+  position:relative;width:min(var(--W),calc(100vw - 32px));height:var(--H);overflow:hidden;color:#fff;
   background-color:var(--chatbg);background-image:var(--pat);background-size:var(--patsize);background-position:center;
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;text-align:left}
@@ -286,15 +290,13 @@ button:disabled{opacity:.45;cursor:default}
         <div class="hdr" id="hdr"></div>
       </div></div>
       <div id="qbar" hidden></div>
+      <div class="rail" id="rail" aria-label="Cuộn khung chat">
+        <button data-sc="top" title="Lên đầu hội thoại" aria-label="Lên đầu hội thoại">⤒</button>
+        <div class="track" id="track" title="Kéo hoặc bấm để cuộn"><div class="thumb" id="thumb"></div></div>
+        <button data-sc="bottom" title="Xuống cuối hội thoại" aria-label="Xuống cuối hội thoại">⤓</button>
+      </div>
     </div>
-    <div class="rail" id="rail" aria-label="Cuộn khung chat">
-      <button data-sc="top" title="Lên đầu hội thoại" aria-label="Lên đầu hội thoại">⤒</button>
-      <button data-sc="up" title="Cuộn lên một đoạn" aria-label="Cuộn lên">▲</button>
-      <div class="track" id="track" title="Kéo con trượt hoặc bấm vào thanh để cuộn"><div class="thumb" id="thumb"></div></div>
-      <button data-sc="down" title="Cuộn xuống một đoạn" aria-label="Cuộn xuống">▼</button>
-      <button data-sc="bottom" title="Xuống cuối hội thoại" aria-label="Xuống cuối hội thoại">⤓</button>
-    </div>
-    </div>
+
     <div class="lcomposer" id="lcomposer" hidden>
       <button class="primary" id="addL2">＋ Thêm cuộc trò chuyện vào danh sách</button>
       <p class="hint" style="margin:0">Chạm vào một dòng để sửa ở khung bên phải. Nhấp đúp vào <b>tên</b>, <b>nội dung</b> hoặc <b>giờ</b> để sửa ngay trên màn hình.</p>
@@ -399,7 +401,7 @@ button:disabled{opacity:.45;cursor:default}
   <table>
     <tr><td class="ic">↶</td><td><b>Hoàn tác / Làm lại</b>Quay lại hoặc làm lại thao tác vừa rồi (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z). Nhớ 50 bước cho mỗi cuộc chat.</td></tr>
     <tr><td class="ic">⬇</td><td><b>Xuất ảnh PNG</b>Chọn ở ô bên cạnh: “phần đang hiển thị” (đúng như đang thấy), “toàn bộ – chia nhiều ảnh” (giữ tỷ lệ khung, ảnh sau nối tiếp ảnh trước, không cắt đôi tin nhắn) hoặc “toàn bộ – 1 ảnh dài”. Trên điện thoại, nhấn giữ ảnh để lưu.</td></tr>
-    <tr><td class="ic">⤒</td><td><b>Thanh cuộn (cạnh khung chat)</b>⤒ lên đầu · ▲ lên một đoạn · kéo con trượt hoặc bấm vào thanh để nhảy tới vị trí · ▼ xuống một đoạn · ⤓ xuống cuối. Lăn chuột trên thanh cũng cuộn được.</td></tr>
+    <tr><td class="ic">⤒</td><td><b>Thanh cuộn</b>Vạch mảnh ở mép phải khung chat, chỉ hiện khi rê chuột vào khung hoặc khi đang cuộn. Kéo vạch hoặc bấm vào thanh để nhảy tới vị trí; ⤒ lên đầu, ⤓ xuống cuối. Thanh này không xuất hiện trong ảnh xuất.</td></tr>
     <tr><td class="ic">➤</td><td><b>Ô soạn tin</b>Chọn người gửi, chọn loại tin, chỉnh giờ rồi nhấn Gửi (hoặc Enter). Shift+Enter để xuống dòng.</td></tr>
     <tr><td class="ic">💬</td><td><b>Văn bản</b>Gõ tin nhắn bình thường. Nút 😊 trong ô gõ mở bảng emoji để chèn vào câu.</td></tr>
     <tr><td class="ic">🖼️</td><td><b>Ảnh</b>Kéo-thả ảnh vào ô nét đứt (hoặc thả thẳng vào khung chat), dán bằng Ctrl/⌘+V, hoặc bấm vào ô để chọn ảnh. Có thể gõ chú thích, rồi bấm “Gửi ảnh”.</td></tr>
@@ -710,7 +712,11 @@ function updateGrad(){
     b.style.setProperty('--gy',(r.top-top)+'px');b.style.setProperty('--bh',r.height+'px');
   });
 }
-$('#scroller').addEventListener('scroll',()=>{updateGrad();placeQbar();updRail()},{passive:true});
+let railT;
+$('#scroller').addEventListener('scroll',()=>{
+  updateGrad();placeQbar();updRail();
+  const r=$('#rail');r.classList.add('show');clearTimeout(railT);railT=setTimeout(()=>r.classList.remove('show'),1200);
+},{passive:true});
 window.addEventListener('resize',()=>{updateGrad();placeQbar();updRail()});
 
 /* ---------- Thanh cuộn cạnh khung chat ---------- */
