@@ -22,7 +22,6 @@ import btc_daily_bot as bot
 
 WINDOW = 24 * 3600
 FINALIZE_SLACK = 30 * 60  # the next morning's run may start a few minutes before 24h is up
-HALF_TP1, HALF_TP2 = 0.5 * bot.TP_RR[0], 0.5 * bot.TP_RR[1]
 
 
 # ---------------------------------------------------------------- state
@@ -79,6 +78,8 @@ def replay(plan, m15, now_ts):
     side = 1 if plan["direction"] == "LONG" else -1
     entry, sl, tp1, tp2, cancel = (plan[k] for k in ("entry", "sl", "tp1", "tp2", "cancel"))
     risk = abs(entry - sl)
+    # R earned by each half: from the plan's own prices, so old and new TP/SL settings both work.
+    HALF_TP1, HALF_TP2 = 0.5 * abs(tp1 - entry) / risk, 0.5 * abs(tp2 - entry) / risk
     start = plan["posted_at"] - plan["posted_at"] % 900
     end = min(now_ts, plan["posted_at"] + WINDOW)
 
@@ -262,7 +263,7 @@ def weekly_text(plans, monday):
         r = p["result"]["r"]
         res = "No trade" if r is None else f"{r:+.2f}R"
         lines.append(f"{d:%a} {'🔴' if p['direction'] == 'SHORT' else '🟢'} {p['direction'].title()} — {res}")
-    lines += ["", f"<i>Every plan is counted, wins and losses. 1R = {bot.SL_PCT:g}% risk from entry.</i>"]
+    lines += ["", "<i>Every plan is counted, wins and losses. 1R = the stop-loss distance from entry.</i>"]
     return "\n".join(lines)
 
 

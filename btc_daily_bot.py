@@ -38,8 +38,11 @@ CHANNEL_NAME = os.environ.get("CHANNEL_NAME", "Value Alpha Crypto")
 ALTCOIN_POOL = [c.strip() for c in os.environ.get(
     "ALTCOIN_POOL", "ETH,SOL,XAUT,BNB,LTC,SUI,XRP,LINK,AVAX,DOT,NEAR,ADA,DOGE,UNI,ZEC").split(",") if c.strip()]
 ALTCOIN_PICKS = 5
-SL_PCT = float(os.environ.get("SL_PCT", "1.2"))  # stop-loss distance from entry, in %
-TP_RR = (1.0, 1.5)                                # TP1 / TP2 as reward-to-risk multiples
+SL_PCT = float(os.environ.get("SL_PCT", "1.25"))  # stop-loss distance from entry, in %
+TP_PCTS = (float(os.environ.get("TP1_PCT", "1.0")), float(os.environ.get("TP2_PCT", "1.6")))  # from entry, in %
+ENTRY_DIST_PCT = 0.35  # entry this far from the current price, inside the analysed zone
+ZONE_HALF_PCT = 0.10   # zone = entry +/- this
+SR_NEAR_PCT = 0.40     # price within this of a support/resistance level counts as "at" the level
 USER_AGENT = "ValueAlphaBTCBot/3.0"
 
 # Display name -> (Bitget granularity, OKX bar, weight in the daily decision)
@@ -148,29 +151,67 @@ def pivots(candles, k=3, key="h"):
 # ------------------------------------------------------------ analysis
 
 def analyze_tf(candles):
+    """Trend score of one timeframe from -6 to +6: price vs EMA20/50/200, EMA20 vs EMA50, RSI, MACD."""
     closes = [c["c"] for c in candles]
     e20, e50, e200 = ema_series(closes, 20), ema_series(closes, 50), ema_series(closes, 200)
     hist = macd_hist(closes)
     price = closes[-1]
     r = rsi(closes)
-    score = (1 if price > e20[-1] else -1) + (1 if e20[-1] > e50[-1] else -1)
+    above = {n: (price > e[-1]) for n, e in ((20, e20), (50, e50), (200, e200)) if e[-1] is not None}
+    score = sum(1 if up else -1 for up in above.values())
+    score += 1 if e20[-1] > e50[-1] else -1
     score += 1 if r > 55 else (-1 if r < 45 else 0)
     score += 1 if hist[-1] > 0 else -1
-    trend = "Bullish" if score >= 2 else ("Bearish" if score <= -2 else "Neutral")
-    return {"score": score, "trend": trend, "rsi": r, "e20": e20, "e50": e50, "e200": e200,
-            "atr": atr(candles), "e20_slope": (e20[-1] - e20[-4]) / price}
+    trend = "Bullish" if score >= 3 else ("Bearish" if score <= -3 else "Neutral")
+    return {"score": score, "trend": trend, "rsi": r, "e20": e20, "e50": e50, "e200": e200, "above": above,
+            "macd": hist[-1], "macd_rising": hist[-1] > hist[-2], "atr": atr(candles),
+            "e20_slope": (e20[-1] - e20[-4]) / price}
+
+
+def nearest_sr(data, sig, price):
+    """Nearest resistance above and support below price, from swing points, yesterday's range and EMA200s."""
+    h4, h1 = data["H4"], data["H1"]
+    levels = [(f"H4 swing high", v) for v in pivots(h4[-90:], 3, "h")[-5:]]
+    levels += [(f"H4 swing low", v) for v in pivots(h4[-90:], 3, "l")[-5:]]
+    levels += [(f"H1 swing high", v) for v in pivots(h1[-72:], 3, "h")[-5:]]
+    levels += [(f"H1 swing low", v) for v in pivots(h1[-72:], 3, "l")[-5:]]
+    yday = (datetime.fromtimestamp(h1[-1]["t"], TZ) - timedelta(days=1)).date()
+    prev_day = [c for c in h1 if datetime.fromtimestamp(c["t"], TZ).date() == yday]
+    if prev_day:
+        levels += [("yesterday's high", max(c["h"] for c in prev_day)), ("yesterday's low", min(c["l"] for c in prev_day))]
+    for tf in ("H4", "H1"):
+        if sig[tf]["e200"][-1] is not None:
+            levels.append((f"{tf} EMA200", sig[tf]["e200"][-1]))
+    above = sorted((lv for lv in levels if lv[1] > price), key=lambda lv: lv[1])
+    below = sorted((lv for lv in levels if lv[1] < price), key=lambda lv: -lv[1])
+    return (above[0] if above else None), (below[0] if below else None)
 
 
 def analyze(data):
     sig = {tf: analyze_tf(c) for tf, c in data.items()}
     price = data["M15"][-1]["c"]
-    total = sum(TIMEFRAMES[tf][2] * sig[tf]["score"] / 4 for tf in TIMEFRAMES)  # -1 .. +1
+    total = sum(TIMEFRAMES[tf][2] * sig[tf]["score"] / 6 for tf in TIMEFRAMES)  # -1 .. +1
     if total == 0:
         total = 0.01 if price > sig["H4"]["e50"][-1] else -0.01
-    direction = "LONG" if total > 0 else "SHORT"
-    a = {"price": price, "sig": sig, "total": total, "direction": direction,
-         "confidence": "High" if abs(total) >= 0.6 else ("Medium" if abs(total) >= 0.3 else "Low")}
-    a["primary"] = build_zone(data, sig, price, direction)
+    res, sup = nearest_sr(data, sig, price)
+    at_res = res is not None and (res[1] - price) / price * 100 <= SR_NEAR_PCT
+    at_sup = sup is not None and (price - sup[1]) / price * 100 <= SR_NEAR_PCT
+    m15, h1, h4 = sig["M15"], sig["H1"], sig["H4"]
+    strong_up = h4["score"] >= 4 and h1["score"] >= 4
+    strong_down = h4["score"] <= -4 and h1["score"] <= -4
+
+    # Default: trade with the multi-timeframe trend. At a key level with stretched RSI and
+    # fading momentum, fade the level instead - unless H4 and H1 both trend hard through it.
+    setup, direction = "trend", ("LONG" if total > 0 else "SHORT")
+    if at_res and max(m15["rsi"], h1["rsi"]) >= 60 and not m15["macd_rising"] and not strong_up:
+        setup, direction = "resistance", "SHORT"
+    elif at_sup and min(m15["rsi"], h1["rsi"]) <= 40 and m15["macd_rising"] and not strong_down:
+        setup, direction = "support", "LONG"
+    agree = abs(total) if (total > 0) == (direction == "LONG") else 0
+    confidence = "High" if agree >= 0.6 else ("Medium" if agree >= 0.3 or setup != "trend" else "Low")
+    a = {"price": price, "sig": sig, "total": total, "direction": direction, "setup": setup,
+         "confidence": confidence, "res": res, "sup": sup, "at_res": at_res, "at_sup": at_sup}
+    a["primary"] = build_setup(data, sig, price, direction)
     return a
 
 
@@ -184,6 +225,8 @@ def candidate_levels(data, sig):
             v = sig[tf][f"e{n}"][-1]
             if v is not None:
                 levels.append((f"{tf} EMA{n}", v))
+    levels += [(f"the {k_fmt(v, 100)} H4 swing high", v) for v in pivots(data["H4"][-90:], 3, "h")[-4:]]
+    levels += [(f"the {k_fmt(v, 100)} H4 swing low", v) for v in pivots(data["H4"][-90:], 3, "l")[-4:]]
     levels += [(f"the {k_fmt(v, 100)} swing high", v) for v in pivots(h1[-72:], 3, "h")[-4:]]
     levels += [(f"the {k_fmt(v, 100)} swing low", v) for v in pivots(h1[-72:], 3, "l")[-4:]]
     levels += [(f"the {k_fmt(v, 100)} M15 swing high", v) for v in pivots(m15[-96:], 4, "h")[-3:]]
@@ -194,48 +237,36 @@ def candidate_levels(data, sig):
     return levels
 
 
-def make_setup(direction, lo, hi):
+def build_setup(data, sig, price, direction):
+    """Entry ~0.35% from price inside the analysed zone; fixed % stop and targets; structural cancel level."""
     side = 1 if direction == "LONG" else -1
-    entry = (lo + hi) / 2
-    risk = entry * SL_PCT / 100
-    return {"direction": direction, "lo": lo, "hi": hi, "entry": entry, "sl": entry - side * risk,
-            "tp1": entry + side * TP_RR[0] * risk, "tp2": entry + side * TP_RR[1] * risk}
-
-
-def build_zone(data, sig, price, direction):
-    """Primary setup: retrace into the nearest confluence zone, plus its cancel level."""
-    side = 1 if direction == "LONG" else -1
-    width = round_to(price * 0.0035, 50) or 50
     levels = candidate_levels(data, sig)
+    target = price * (1 - side * ENTRY_DIST_PCT / 100)
+    # Snap the entry to a confluence level when one sits close to the 0.35% mark.
+    near = [lv for lv in levels if 0.25 <= side * (price - lv[1]) / price * 100 <= 0.45]
+    entry = min(near, key=lambda lv: abs(lv[1] - target))[1] if near else target
+    half = entry * ZONE_HALF_PCT / 100
+    lo, hi = round_to(entry - half, 10), round_to(entry + half, 10)
+    entry = (lo + hi) / 2
+    reasons = [name for name, v in levels if lo - 2 * half <= v <= hi + 2 * half]
 
-    # Primary: nearest level on the pullback side (resistance for shorts, support for longs).
-    pullback_side = sorted([lv for lv in levels if 0.001 < side * (price - lv[1]) / price < 0.02],
-                           key=lambda lv: side * (price - lv[1]))
-    if pullback_side:
-        center = pullback_side[0][1]
-        lo, hi = round_to(center - width / 2, 50), round_to(center + width / 2, 50)
-        # keep the zone fully on the pullback side of price
-        if side == -1 and lo <= price:
-            lo, hi = round_to(price * 1.001, 50) + 50, round_to(price * 1.001, 50) + 50 + width
-        if side == 1 and hi >= price:
-            hi, lo = round_to(price * 0.999, 50) - 50, round_to(price * 0.999, 50) - 50 - width
-        reasons = [name for name, v in levels if lo - width * 0.5 <= v <= hi + width * 0.5]
-    else:
-        base = price * (1 - side * 0.003)
-        lo, hi = sorted((round_to(base, 50), round_to(base - side * width, 50)))
-        reasons = []
-    primary = make_setup(direction, lo, hi)
+    sl = entry * (1 - side * SL_PCT / 100)
+    st = {"direction": direction, "lo": lo, "hi": hi, "entry": entry, "sl": sl,
+          "tp1": entry * (1 + side * TP_PCTS[0] / 100), "tp2": entry * (1 + side * TP_PCTS[1] / 100),
+          "reasons": list(dict.fromkeys(reasons))[:3]}
     recent = data["H1"][-24:]
-    primary["reasons"] = list(dict.fromkeys(reasons))[:3]
-    primary["guard"] = (max(c["h"] for c in recent) if side == -1 else min(c["l"] for c in recent))
+    st["guard"] = max(c["h"] for c in recent) if side == -1 else min(c["l"] for c in recent)
 
-    # Cancel level: the recent swing extreme if it sits between the zone and the SL, else the SL itself.
-    g = primary["guard"]
-    if side == -1:
-        primary["cancel"] = g if primary["hi"] < g < primary["sl"] else primary["sl"]
+    # Cancel: the nearest structure level beyond the zone (but before the stop). An H1 close
+    # through it means BTC is moving against the analysis, so the plan is dropped early.
+    beyond = [lv for lv in levels if side * (lv[1] - (lo if side == 1 else hi)) < 0
+              and abs(lv[1] - entry) / entry * 100 >= 0.4 and side * (lv[1] - sl) > 0]
+    if beyond:
+        ref = min(beyond, key=lambda lv: abs(lv[1] - entry))
+        st["cancel"], st["cancel_ref"] = ref[1], ref[0]
     else:
-        primary["cancel"] = g if primary["sl"] < g < primary["lo"] else primary["sl"]
-    return primary
+        st["cancel"], st["cancel_ref"] = entry * (1 - side * 0.6 * SL_PCT / 100), None
+    return st
 
 
 # -------------------------------------------------------------- format
@@ -256,59 +287,61 @@ def join_words(items):
     return ", ".join(items[:-1]) + f", and {items[-1]}"
 
 
+def ema_position(sg):
+    """'below EMA20/50/200', 'above EMA20/50/200' or 'above EMA20, below EMA50/200'."""
+    ups = [str(n) for n, up in sg["above"].items() if up]
+    downs = [str(n) for n, up in sg["above"].items() if not up]
+    parts = ([f"above EMA{'/'.join(ups)}"] if ups else []) + ([f"below EMA{'/'.join(downs)}"] if downs else [])
+    return ", ".join(parts)
+
+
+def momentum(sg):
+    if sg["macd"] > 0:
+        return "bullish momentum building" if sg["macd_rising"] else "bullish momentum fading"
+    return "bearish momentum fading" if sg["macd_rising"] else "bearish momentum building"
+
+
 def mtf_summary(a, data):
-    """One chained sentence across H4 -> H1 -> M30/M15, plus a one-line conclusion."""
+    """One chained paragraph H4 -> H1 -> M30/M15 (EMA20/50/200, RSI, momentum, S/R) plus a conclusion."""
     sig, price, short = a["sig"], a["price"], a["direction"] == "SHORT"
-    h4, h1, m15 = sig["H4"], sig["H1"], sig["M15"]
-
-    # H4: swing structure + position versus its EMAs
+    h4, h1, m30, m15 = (sig[tf] for tf in ("H4", "H1", "M30", "M15"))
     swings = pivots(data["H4"][-90:], 3, "h" if short else "l")[-4:]
-    emas = [h4[f"e{n}"][-1] for n in (20, 50, 200) if h4[f"e{n}"][-1] is not None]
-    if all(price < e for e in emas):
-        ema_pos = "below all key EMAs"
-    elif all(price > e for e in emas):
-        ema_pos = "above all key EMAs"
-    else:
-        ema_pos = "caught between its EMAs"
     trending = len(swings) >= 2 and all((b < x) if short else (b > x) for x, b in zip(swings, swings[1:]))
+    structure = ""
     if trending:
-        kind = "lower highs" if short else "higher lows"
-        h4_part = f"H4 keeps printing {kind} ({k_fmt(swings[0], 100)} → {k_fmt(swings[-1], 100)}) {ema_pos}"
-    else:
-        h4_part = f"H4 structure is mixed with price {ema_pos}"
-
-    # H1: position versus EMA20/50
-    e20, e50 = h1["e20"][-1], h1["e50"][-1]
-    if min(abs(price - e20), abs(price - e50)) / price < 0.0015:
-        h1_part = "H1 is testing its EMA20/50"
-    elif price < min(e20, e50):
-        h1_part = "H1 is holding below EMA20/50"
-    elif price > max(e20, e50):
-        h1_part = "H1 is holding above EMA20/50"
-    else:
-        h1_part = "H1 is trading between EMA20 and EMA50"
-
-    # M30/M15: momentum
-    r = m15["rsi"]
-    mood = "weak" if r < 45 else ("strong" if r > 55 else "neutral")
-    ltf_part = f"M30/M15 momentum is {mood} (RSI {r:.0f})"
-    chain = f"{h4_part}, {h1_part}, and {ltf_part}."
+        structure = f" with {'lower highs' if short else 'higher lows'} ({k_fmt(swings[0], 100)} → {k_fmt(swings[-1], 100)})"
+    chain = (f"H4 trades {ema_position(h4)}{structure} (RSI {h4['rsi']:.0f}, {momentum(h4)}); "
+             f"H1 is {ema_position(h1)} (RSI {h1['rsi']:.0f}); "
+             + (f"M30/M15 are {ema_position(m15)}" if ema_position(m30) == ema_position(m15)
+                else f"M30 is {ema_position(m30)} and M15 {ema_position(m15)}")
+             + f" (RSI {m15['rsi']:.0f}, {momentum(m15)}).")
+    res, sup = a["res"], a["sup"]
+    if a["at_res"]:
+        chain += f" Price is testing resistance at {k_fmt(res[1], 100)} ({res[0]})."
+    elif a["at_sup"]:
+        chain += f" Price is testing support at {k_fmt(sup[1], 100)} ({sup[0]})."
+    elif res and sup:
+        chain += f" Nearest resistance {k_fmt(res[1], 100)}, support {k_fmt(sup[1], 100)}."
 
     want = "Bearish" if short else "Bullish"
     aligned = sum(sig[tf]["trend"] == want for tf in TIMEFRAMES)
-    lower_against = any(sig[tf]["trend"] not in (want, "Neutral") for tf in ("M30", "M15"))
-    if sig["H4"]["trend"] == want and aligned >= 3 and not lower_against and not trending:
-        conclusion = (f"Momentum favours the {'downside' if short else 'upside'} across timeframes, but the H4 "
-                      f"structure is not clean yet — {'sell rebounds' if short else 'buy dips'} only with tight risk.")
-    elif sig["H4"]["trend"] == want and aligned >= 3 and not lower_against:
+    if a["setup"] == "resistance":
+        conclusion = (f"Price is at resistance with stretched RSI and fading momentum — favour a SHORT from this "
+                      f"level, with tight risk as the higher-timeframe trend is {h4['trend'].lower()}.")
+    elif a["setup"] == "support":
+        conclusion = (f"Price is at support with stretched RSI and recovering momentum — favour a LONG from this "
+                      f"level, with tight risk as the higher-timeframe trend is {h4['trend'].lower()}.")
+    elif h4["trend"] == want and aligned >= 3:
         conclusion = (f"Timeframes are aligned to the {'downside' if short else 'upside'} — "
-                      f"{'sell rebounds into resistance' if short else 'buy dips into support'} rather than chasing the move.")
-    elif sig["H4"]["trend"] == want:
-        conclusion = (f"The H4 {'downtrend' if short else 'uptrend'} is intact while lower timeframes are still "
-                      f"{'rebounding' if short else 'pulling back'} — wait for that move to stall at the zone "
-                      f"before {'shorting' if short else 'buying'}.")
+                      f"{'sell the rebound into the zone' if short else 'buy the dip into the zone'} rather than chasing.")
+    elif h4["trend"] == want:
+        conclusion = (f"The H4 {'downtrend' if short else 'uptrend'} is intact while lower timeframes are mixed — "
+                      f"wait for the {'rebound' if short else 'pullback'} to stall at the zone before entering.")
     else:
-        conclusion = ("Signals are mixed and the bias is weak — trade smaller and only on clear confirmation.")
+        conclusion = "Signals are mixed and the bias is weak — trade smaller and only on clear confirmation."
+    if a["setup"] == "trend" and ((a["at_res"] and not short) or (a["at_sup"] and short)):
+        lvl = res if a["at_res"] else sup
+        conclusion += f" Price is pressing into {k_fmt(lvl[1], 100)}: let it {'pull back' if not short else 'bounce'} first."
     return chain, conclusion
 
 
@@ -326,7 +359,7 @@ def build_post(a, data, now):
     short = a["direction"] == "SHORT"
     p = a["primary"]
     word = "Short" if short else "Long"
-    zone = f"{k_fmt(p['lo'], 50)}–{k_fmt(p['hi'], 50)}"
+    zone = f"{k_fmt(p['lo'])}–{k_fmt(p['hi'])}"
     if p["reasons"]:
         why = f"This area aligns with {join_words(p['reasons'])}"
     else:
@@ -352,13 +385,14 @@ def build_post(a, data, now):
         f"🎯 <b>KEY {a['direction']} ZONE</b>",
         "",
         f"{'🔴' if short else '🟢'} <b>Primary {word}: {zone}</b>",
-        f"Wait for price to {'rebound' if short else 'pull back'} into this zone and show "
-        f"{'bearish' if short else 'bullish'} rejection. {html.escape(why)}.",
+        f"Wait for price to {'rebound' if short else 'pull back'} into this zone (~{ENTRY_DIST_PCT:g}% from current "
+        f"price) and show {'bearish' if short else 'bullish'} rejection. {html.escape(why)}.",
         *setup_lines(p),
         "",
         f"🚫 <b>Cancel {word} Scenario</b>",
-        f"• An H1 candle closes {'above' if short else 'below'} {k_fmt(p['cancel'])} — the "
-        f"{'bearish' if short else 'bullish'} structure is broken: exit or stand aside.",
+        f"• An H1 candle closes {'above' if short else 'below'} {k_fmt(p['cancel'])}"
+        + (f" ({html.escape(p['cancel_ref'])})" if p.get("cancel_ref") else "")
+        + " — BTC is moving against the analysis: exit or stand aside.",
         f"• Price {'drops' if short else 'rallies'} to {k_fmt(p['tp1'])} before reaching the zone — "
         "the move has played out: do not chase.",
         "• The zone is not reached by the end of the day — the plan expires.",
@@ -438,36 +472,69 @@ def draw_plan_image(data, a, now, path):
 
     price = a["price"]
     zone_mid = (p["lo"] + p["hi"]) / 2
-    levels = [p["sl"], p["tp1"], p["tp2"], p["lo"], p["hi"]]
+    warn = "#f59e0b"
+    levels = [p["sl"], p["tp1"], p["tp2"], p["lo"], p["hi"], p["cancel"]]
     ys = [c["l"] for c in candles] + [c["h"] for c in candles] + levels
     span = max(ys) - min(ys)
     ymin, ymax = min(ys) - span * 0.06, max(ys) + span * 0.14
-    xmax = n + 34
+    xmax = n + 50  # room on the right for the scenario arrows and the level labels
     ax.set_xlim(-2, xmax)
     ax.set_ylim(ymin, ymax)
 
-    # plan zone + SL/TP
+    # plan zone + SL/TP + cancel level; labels are spread so they never overlap
     zx0 = n - 70
     ax.fill_between([zx0, xmax], p["lo"], p["hi"], color=accent, alpha=0.32, linewidth=0)
     ax.hlines([p["lo"], p["hi"]], zx0, xmax, color=accent, linewidth=1, alpha=0.8)
-    for name, y, col in (("SL", p["sl"], down), ("TP1", p["tp1"], up), ("TP2", p["tp2"], up)):
-        ax.hlines(y, n - 62, xmax, color=col, linestyle=(0, (5, 4)), linewidth=1)
-        ax.text(n - 62, y + span * 0.008, f"{name} {k_fmt(y)}", color=col, fontsize=10, fontweight="bold",
-                va="bottom")
+    marks = [("SL", p["sl"], down, (0, (5, 4))), ("TP1", p["tp1"], up, (0, (5, 4))),
+             ("TP2", p["tp2"], up, (0, (5, 4))), ("CANCEL", p["cancel"], warn, (0, (8, 3, 2, 3)))]
+    last_y = None
+    for name, y, col, style in sorted(marks, key=lambda m: m[1]):
+        ax.hlines(y, n - 62, xmax, color=col, linestyle=style, linewidth=1.2, zorder=4)
+        ty = y if last_y is None else max(y, last_y + span * 0.045)
+        last_y = ty
+        ax.text(xmax - 0.5, ty + span * 0.008, f"{name} {k_fmt(y)}", color=col, fontsize=10, fontweight="bold",
+                ha="right", va="bottom", zorder=6,
+                bbox=dict(boxstyle="round,pad=0.15", facecolor=bg, edgecolor="none", alpha=0.85))
 
     # scenario arrow: retrace into the zone, then continue in the bias direction
     x0, x1, x2 = n + 1, n + 9, n + 21
     y_end = zone_mid - (zone_mid - price) * 2.0
     y_end = max(y_end, ymin + span * 0.05) if short else min(y_end, ymax - span * 0.05)
-    ax.plot([x0, x1], [price, zone_mid], color=accent, linewidth=3, solid_capstyle="round")
-    ax.annotate("", xy=(x2, y_end), xytext=(x1, zone_mid),
+    ax.plot([x0, x1], [price, zone_mid], color=accent, linewidth=3, solid_capstyle="round", zorder=5)
+    ax.annotate("", xy=(x2, y_end), xytext=(x1, zone_mid), zorder=5,
                 arrowprops=dict(arrowstyle="-|>,head_width=0.6,head_length=1.0", color=accent, linewidth=3))
 
-    # callout
-    cy = p["hi"] + span * 0.16 if short else p["lo"] - span * 0.16
-    cy = min(max(cy, ymin + span * 0.1), ymax - span * 0.08)
-    ax.text(n + 6, cy, f"{a['direction']} ZONE:\n{k_fmt(p['lo'], 50)} – {k_fmt(p['hi'], 50)}",
-            color=fg, fontsize=15, fontweight="bold", ha="center", va="center", linespacing=1.4,
+    # cancel illustration: BTC pushes through the cancel level instead -> plan dropped
+    c_end = p["cancel"] + (span * 0.06 if short else -span * 0.06)
+    c_end = min(max(c_end, ymin + span * 0.03), ymax - span * 0.03)
+    ax.annotate("", xy=(n + 20, c_end), xytext=(x0, price), zorder=4,
+                arrowprops=dict(arrowstyle="-|>,head_width=0.45,head_length=0.8", color=warn, linewidth=1.8,
+                                linestyle=(0, (4, 3)), alpha=0.9))
+    cross_x = x0 + (n + 20 - x0) * (p["cancel"] - price) / (c_end - price)
+    ax.plot([cross_x], [p["cancel"]], marker="X", markersize=13, color=warn, markeredgecolor=bg, zorder=6)
+    ax.text(n + 20, c_end + (span * 0.015 if short else -span * 0.015), "PLAN CANCELLED", color=warn,
+            fontsize=9, fontweight="bold", ha="center", va="bottom" if short else "top", zorder=6,
+            bbox=dict(boxstyle="round,pad=0.2", facecolor=bg, edgecolor="none", alpha=0.85))
+
+    # callout: first spot near the zone that clears the level lines and the recent candles
+    cx = n - 48
+    win = candles[max(0, cx - 14):cx + 14]
+    c_lo, c_hi = min(c["l"] for c in win), max(c["h"] for c in win)
+    half = span * 0.075
+    marks_y = [m[1] for m in marks]
+    away = 1 if short else -1  # zone side first
+    options = [p["hi"] + span * 0.16, p["hi"] + span * 0.3, p["lo"] - span * 0.16, p["lo"] - span * 0.3,
+               ymax - span * 0.1, ymin + span * 0.1]
+    if away == -1:
+        options = options[2:4] + options[:2] + options[4:]
+    options = [y for y in options if ymin + span * 0.08 <= y <= ymax - span * 0.08] or [(ymin + ymax) / 2]
+
+    def clash(y):
+        return (sum(abs(y - m) < half for m in marks_y) + (p["lo"] - half < y < p["hi"] + half) * 2
+                + (not (y + half < c_lo or y - half > c_hi)))
+    cy = min(options, key=clash)
+    ax.text(cx, cy, f"{a['direction']} ZONE:\n{k_fmt(p['lo'])} – {k_fmt(p['hi'])}",
+            color=fg, fontsize=15, fontweight="bold", ha="center", va="center", linespacing=1.4, zorder=7,
             bbox=dict(boxstyle="round,pad=0.5", facecolor="#1a0b0e" if short else "#0b1a10",
                       edgecolor=accent, linewidth=2))
 
@@ -499,7 +566,7 @@ def draw_plan_image(data, a, now, path):
     box(0.705, 0.30, 0.282, 0.555, gold, face="#0d0f14")
     ov.text(0.728, 0.80, "◎", color=gold, fontsize=30, va="center", ha="center")
     ov.text(0.75, 0.80, "ENTRY CONDITIONS", color=gold, fontsize=22, fontweight="bold", va="center")
-    zone_txt = f"{k_fmt(p['lo'], 50)} – {k_fmt(p['hi'], 50)}"
+    zone_txt = f"{k_fmt(p['lo'])} – {k_fmt(p['hi'])}"
     items = [
         (f"Price {'rebounds' if short else 'pulls back'} into", zone_txt),
         (f"{'Bearish' if short else 'Bullish'} rejection /\nreversal candle appears", None),
