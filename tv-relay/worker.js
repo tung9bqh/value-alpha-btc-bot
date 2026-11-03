@@ -224,14 +224,14 @@ async function sendPhoto(env, chatId, png, caption, replyTo) {
 }
 
 // KV value: the entry post's message_id, with the trade details (JSON) since
-// chart replies; older entries hold only the message_id.
+// chart replies and tp1: true once TP1 was hit; older entries hold only the message_id.
 async function loadTrade(env, key) {
   const raw = await env.TRADES.get(key);
   if (!raw) return {};
   if (/^\d+$/.test(raw)) return { messageId: Number(raw) };
   try {
     const v = JSON.parse(raw);
-    return { messageId: Number(v.m) || null, trade: v.trade || null };
+    return { messageId: Number(v.m) || null, trade: v.trade || null, tp1Hit: Boolean(v.tp1), record: v };
   } catch {
     return {};
   }
@@ -245,14 +245,21 @@ async function relay(body, env) {
   const key = `${chatId}|${tradeId}`;
   const margin = Number(env.RESULT_MARGIN) || 2500;
 
-  let trade = null, replyTo = null;
+  let trade = null, replyTo = null, tp1Hit = false, record = null;
   if (event === "entry") {
     trade = tradeFromEntry(body);
   } else if (tradeId) {
-    ({ messageId: replyTo, trade } = await loadTrade(env, key));
+    ({ messageId: replyTo, trade, tp1Hit, record } = await loadTrade(env, key));
+  }
+  const ticker = trade?.ticker || tradeId.split("-")[0] || "";
+  if (event === "tp1") {
+    // After TP1 the stop moves to the entry price (breakeven).
+    const be = trade ? `: ${trade.entry.toFixed(trade.decimals)}` : "";
+    text = `✅ HIT TP1${ticker ? ` | ${ticker}` : ""}\nTake 1/2 profit\nMove SL to BreakEven${be}`;
   }
   if (event === "sl") {
-    const ticker = trade?.ticker || tradeId.split("-")[0] || "";
+    // Once TP1 was hit the stop sits at breakeven, so the trade's SL is not posted.
+    if (tp1Hit) return { ok: true, event, id: tradeId, skipped: "SL after TP1 (stop at breakeven)" };
     text = `❌ HIT SL${ticker ? ` | ${ticker}` : ""}`;
   }
 
@@ -281,6 +288,9 @@ async function relay(body, env) {
   const messageId = result.result.message_id;
   if (event === "entry" && tradeId) {
     await env.TRADES.put(key, JSON.stringify({ m: messageId, trade }), { expirationTtl: TRADE_TTL_SECONDS });
+  } else if (event === "tp1" && tradeId) {
+    const updated = record ? { ...record, tp1: true } : { m: replyTo, trade: null, tp1: true };
+    await env.TRADES.put(key, JSON.stringify(updated), { expirationTtl: TRADE_TTL_SECONDS });
   }
   return {
     ok: true, event, id: tradeId, message_id: messageId,
@@ -301,7 +311,7 @@ async function logRequest(env, entry) {
 }
 
 const summary = (r) => r.ok
-  ? { ok: true, photo: r.photo, reply_to: r.reply_to, chart_error: r.chart_error || undefined }
+  ? { ok: true, photo: r.photo, reply_to: r.reply_to, chart_error: r.chart_error || undefined, skipped: r.skipped }
   : { ok: false, error: r.error, chart_error: r.chart_error || undefined };
 
 export async function handle(request, env, ctx) {

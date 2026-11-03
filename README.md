@@ -71,7 +71,7 @@ Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào 
   (*Create Custom Token* → quyền **Account · Browser Run · Edit**; tên cũ: Browser Rendering) và lưu vào secret `CLOUDFLARE_BROWSER_TOKEN`,
   rồi chạy lại workflow. Thiếu secret này hoặc vẽ ảnh lỗi thì bài vẫn được đăng dạng chữ như cũ.
 - **TP1 / TP2**: trả lời bằng ảnh chart tới thời điểm chạm TP (đánh dấu điểm chạm) kèm ROI và PnL của tín hiệu
-  tính trên margin 2.500 USDT (biến `RESULT_MARGIN` trong `tv-relay/wrangler.toml`, không tính phí). **SL**: chỉ ghi `❌ HIT SL | <cặp>`.
+  tính trên margin 2.500 USDT (biến `RESULT_MARGIN` trong `tv-relay/wrangler.toml`, không tính phí). Tin TP1 ghi `✅ HIT TP1 | <cặp>` kèm *Take 1/2 profit · Move SL to BreakEven: <entry>*. **SL**: chỉ ghi `❌ HIT SL | <cặp>`, và **không báo** nếu lệnh đã chạm TP1 (SL lúc đó đã dời về hoà vốn).
 - Code chỉ báo không lưu trong repo (repo public).
 
 ## Hẹn giờ đúng giờ bằng Cloudflare (`scheduler/`)
