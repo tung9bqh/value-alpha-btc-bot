@@ -139,9 +139,16 @@ button:disabled{opacity:.45;cursor:default}
 #qbar .qhelp{margin-left:auto;font-size:12px;padding:4px 9px;background:#252733;border:1px solid var(--ui-line);border-radius:8px}
 .qbtns{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(48px,1fr);gap:2px}
 #qbar .qbtns button{flex-direction:column;gap:3px;min-width:0;padding:6px 3px 5px;border:none;background:none;font-size:17px;line-height:1;border-radius:8px}
-#qbar .qbtns button small{font-size:10.5px;color:#c4c6d2;line-height:1.1;white-space:nowrap}
+#qbar .qbtns button small{font-size:10.5px;color:#c4c6d2;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 #qbar .qbtns button.danger small{color:#ff9c9c}
 #qbar button:hover{background:#2e3140}
+.qtop{flex-wrap:wrap}
+.qtop .qnum{width:54px;padding:4px 6px;font-size:13px;margin:0}
+.qbtns.l{grid-auto-flow:row;grid-template-columns:repeat(6,minmax(0,1fr))}
+#qbar .qbtns.l button{padding:6px 0 5px}
+#qbar .qbtns.l button small{font-size:10px;letter-spacing:-.1px}
+#qbar .qbtns button.on{background:#2a2350;box-shadow:inset 0 0 0 1px var(--ui-acc)}
+.qbadges .bpick{margin:0;justify-content:center}
 #qbar .qx{padding:4px 9px;font-size:12px;background:#252733;border:1px solid var(--ui-line);border-radius:8px}
 .help-box{max-width:560px;justify-items:stretch;text-align:left}
 .help-box h2{font-size:17px;margin:0}
@@ -229,6 +236,12 @@ button:disabled{opacity:.45;cursor:default}
 .sel .bubble,.sel .sticker,.sel.svc span{outline:2px dashed #ffd54a;outline-offset:2px}
 #screen.exporting .sel .bubble,#screen.exporting .sel .sticker,#screen.exporting .sel.svc span{outline:none}
 .row,.svc{cursor:pointer}
+.bpick{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.bpick button{width:34px;height:32px;padding:0;justify-content:center;font-size:17px;border-radius:8px;line-height:1}
+.bpick button.on{border-color:var(--ui-acc);background:#2a2350;box-shadow:inset 0 0 0 1px var(--ui-acc)}
+.bpick button.clr{font-size:12px;color:var(--ui-mute)}
+.bdg-svg{display:inline-block;vertical-align:-3px}
+.name .bdg{margin-left:1px}
 /* ----- Màn hình danh sách chat ----- */
 .vswitch{display:flex;gap:3px;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:10px;padding:3px}
 .vswitch button{border:none;background:none;padding:7px 12px;border-radius:7px;font-size:13px}
@@ -422,6 +435,11 @@ button:disabled{opacity:.45;cursor:default}
     <tr><td class="ic">📋</td><td><b>Danh sách chat</b>Bấm “📋 Danh sách chat” ở trên khung (hoặc tab “Danh sách chat”) để chuyển sang màn hình danh sách. Chạm vào một dòng để sửa tên, ảnh, nội dung, ngày giờ, dấu tick, số tin chưa đọc… ở khung bên phải. Nhấp đúp vào tên, nội dung hoặc giờ để sửa ngay trên màn hình.</td></tr>
     <tr><td class="ic">🎨</td><td><b>Giao diện danh sách</b>Cuối tab “Danh sách chat”: chọn bộ màu có sẵn, bật/tắt thanh tiêu đề, đổi màu nền, màu dòng được chọn, màu nhấn.</td></tr>
   </table>
+  <h3>Avatar &amp; huy hiệu</h3>
+  <table>
+    <tr><td class="ic">🎲</td><td><b>Ngẫu nhiên</b>Ở tab “Người chat”, “Danh sách chat” và avatar nhóm: bấm để tạo ngay một avatar minh hoạ ngẫu nhiên; bấm tiếp để đổi cái khác.</td></tr>
+    <tr><td class="ic">✔</td><td><b>Huy hiệu sau tên</b>Bấm một trong 10 huy hiệu (tích xanh, sao Premium, 💎 🔥 👑 🚀 💰 ⚡ 🌟 🐳) để dùng ngay, ✕ để bỏ, hoặc gõ emoji/chữ tuỳ ý vào ô bên dưới.</td></tr>
+  </table>
   <h3>Mẹo</h3>
   <ul>
     <li>Nhấp đúp vào chữ trong tin nhắn cũng sửa trực tiếp được.</li>
@@ -511,7 +529,7 @@ function sanitize(d){
   L.showHeader=!!L.showHeader;L.title=String(L.title??'');L.leftText=String(L.leftText??'');
   L.items=(Array.isArray(L.items)?L.items:dl.items).filter(x=>x&&typeof x==='object').map(x=>({
     id:okId(x.id)?x.id:uid(), name:String(x.name??''), avatar:okImg(x.avatar)?x.avatar:'', color:okColor(x.color)?x.color:'#7e8fa3',
-    badge:['none','verified','custom'].includes(x.badge)?x.badge:'none', badgeText:String(x.badgeText??''),
+    badge:['none','verified','premium','custom'].includes(x.badge)?x.badge:'none', badgeText:String(x.badgeText??''),
     time:String(x.time??''), status:['none','sent','read'].includes(x.status)?x.status:'none',
     type:LTYPES.includes(x.type)?x.type:'text', prefix:String(x.prefix??''), text:String(x.text??''), thumb:okImg(x.thumb)?x.thumb:'',
     unread:Math.max(0,Math.min(99999,parseInt(x.unread)||0)), pinned:!!x.pinned, muted:!!x.muted, online:!!x.online,
@@ -633,6 +651,48 @@ function renderHeader(){
     <div class="pill ttl"><div class="t">${esc(c.title)}</div>${c.subtitle?`<div class="s">${esc(c.subtitle)}</div>`:''}</div>
     <div class="hav" style="background:linear-gradient(color-mix(in srgb,${c.avatarColor} 70%,white),${c.avatarColor})">${c.avatarImg?`<img src="${c.avatarImg}" alt="">`:esc(c.avatarText)}</div>`;
 }
+/* ---------- Huy hiệu sau tên: 10 loại hay gặp trên Telegram ---------- */
+const verSVG=(fill,size=17)=>`<svg class="bdg-svg lver" width="${size}" height="${size}" viewBox="0 0 24 24"><path fill="${fill}" d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const premSVG=(size=17)=>`<svg class="bdg-svg" width="${size}" height="${size}" viewBox="0 0 24 24"><defs><linearGradient id="pmg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6aa8ff"/><stop offset=".55" stop-color="#8d6cff"/><stop offset="1" stop-color="#d36bff"/></linearGradient></defs><path fill="url(#pmg)" d="M12 1.8l3 6.4 7 .8-5.2 4.8 1.4 6.9L12 17.3l-6.2 3.4 1.4-6.9L2 9l7-.8z"/></svg>`;
+const BADGES=[
+  {k:':verified:',label:'Tích xanh (tài khoản đã xác minh)'},
+  {k:':premium:',label:'Ngôi sao Telegram Premium'},
+  {k:'💎',label:'Kim cương'},{k:'🔥',label:'Lửa'},{k:'👑',label:'Vương miện'},{k:'🚀',label:'Tên lửa'},
+  {k:'💰',label:'Túi tiền'},{k:'⚡',label:'Tia sét'},{k:'🌟',label:'Ngôi sao sáng'},{k:'🐳',label:'Cá voi'},
+];
+function badgeHTML(b,blue='#4c9cf0'){
+  if(!b) return '';
+  if(b===':verified:') return verSVG(blue);
+  if(b===':premium:') return premSVG();
+  return `<span class="bdg">${esc(b)}</span>`;
+}
+function badgePicker(cur,attr){
+  return `<div class="bpick">${BADGES.map(x=>`<button type="button" class="${cur===x.k?'on':''}" data-${attr}="${esc(x.k)}" title="${esc(x.label)}" aria-label="${esc(x.label)}">${badgeHTML(x.k)}</button>`).join('')}`+
+    `<button type="button" class="clr" data-${attr}="" title="Bỏ huy hiệu" aria-label="Bỏ huy hiệu">✕</button></div>`;
+}
+/* ---------- Avatar ngẫu nhiên (vẽ ngay trong trình duyệt, không dùng ảnh người thật) ---------- */
+const AV_EMOJI='🦊 🐼 🐨 🐯 🦁 🐸 🐵 🐧 🐙 🦄 🐳 🦉 🐻 🐰 🐶 🐱 🦋 🌵 🍀 🌸 🍉 🍩 ⚽ 🎧 🎮 🚀 🌙 ⭐ 🔥 💎 🐲 🦖'.split(' ');
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+function randomAvatar(){
+  const N=256, c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d');
+  const h=Math.random()*360, h2=(h+40+Math.random()*90)%360;
+  const gr=g.createLinearGradient(0,0,N,N);gr.addColorStop(0,`hsl(${h},72%,64%)`);gr.addColorStop(1,`hsl(${h2},66%,44%)`);
+  g.fillStyle=gr;g.fillRect(0,0,N,N);
+  const style=Math.floor(Math.random()*3);
+  if(style===0){                                     // emoji minh hoạ
+    g.font='150px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    g.textAlign='center';g.textBaseline='middle';g.fillText(pick(AV_EMOJI),N/2,N/2+10);
+  }else if(style===1){                               // hoạ tiết bong bóng
+    for(let i=0;i<7;i++){g.beginPath();g.fillStyle=`hsla(${(h+i*47)%360},85%,${55+Math.random()*25}%,.55)`;
+      g.arc(Math.random()*N,Math.random()*N,28+Math.random()*90,0,Math.PI*2);g.fill()}
+  }else{                                             // khối hình đối xứng
+    g.fillStyle='rgba(255,255,255,.88)';const s=36,o=(N-5*s)/2;
+    let any=false;
+    for(let y=0;y<5;y++)for(let x=0;x<3;x++) if(Math.random()<.5){any=true;g.fillRect(o+x*s,o+y*s,s,s);g.fillRect(o+(4-x)*s,o+y*s,s,s)}
+    if(!any) g.fillRect(o+2*s,o+2*s,s,s);
+  }
+  return c.toDataURL('image/png');
+}
 const LICON={
   verified:'<svg class="lver" width="19" height="19" viewBox="0 0 24 24"><path fill="var(--l-acc)" d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   file:'<svg width="16" height="18" viewBox="0 0 16 18"><path fill="currentColor" d="M2 0h7.5L15 5.5V16a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/><path fill="var(--l-bg)" opacity=".35" d="M9 0v5a1 1 0 0 0 1 1h5z"/></svg>',
@@ -649,7 +709,7 @@ function lPreviewText(it){return it.text||({photo:'Photo',call:'Canceled call',t
 function renderListRows(){
   return S.list.items.map(it=>{
     const ticks=it.status==='read'?TICK2:it.status==='sent'?TICK1:'';
-    const badge=it.badge==='verified'?LICON.verified:it.badge==='custom'&&it.badgeText?`<span class="lbadge">${esc(it.badgeText)}</span>`:'';
+    const badge=it.badge==='verified'?verSVG('var(--l-acc)',19):it.badge==='premium'?premSVG(19):it.badge==='custom'&&it.badgeText?`<span class="lbadge">${esc(it.badgeText)}</span>`:'';
     const acc=['photo','file','call','typing'].includes(it.type);
     const pre=it.type==='photo'?(it.thumb?`<img class="lthumb" src="${it.thumb}" alt="">`:''):it.type==='file'?LICON.file:it.type==='call'?LICON.call:it.type==='forward'?LICON.forward:it.type==='draft'?'<span class="ldraft">Draft:</span>':'';
     const right2=it.unread?`<span class="lunread${it.muted?' muted':''}">${it.unread}</span>`:it.pinned?LICON.pin:'';
@@ -685,7 +745,7 @@ function renderMsgs(){
     const out=m.from==='me', p=person(m.from);
     const showAv=!out&&c.showAvatars;
     const meta=metaHTML(m,out), spacer=`<span class="spacer">${meta}</span>`;
-    const nameH=(!out&&first&&c.showNames)?`<div class="name" style="color:${p.color}">${esc(p.name)}${p.badge?` <span>${esc(p.badge)}</span>`:''}</div>`:'';
+    const nameH=(!out&&first&&c.showNames)?`<div class="name" style="color:${p.color}">${esc(p.name)}${p.badge?` ${badgeHTML(p.badge)}`:''}</div>`:'';
     const reacts=reactsHTML(m);
     const tail=last?'<span class="tail"></span>':'';
     let body='';
@@ -776,7 +836,45 @@ const QACT=[
   {q:'more',icon:'⚙️',label:'Chi tiết',desc:'Mở form đầy đủ: đổi loại tin (ảnh, sticker, mốc ngày), dấu ✓✓, nhãn “edited”, trích dẫn, reaction…'},
   {q:'close',icon:'✕',label:'Đóng',desc:'Bỏ chọn tin và ẩn thanh này (giống chạm vào chỗ trống hoặc nhấn Esc).'},
 ];
+const QLTOP=[
+  {icon:'🕑',label:'Ngày/giờ',desc:'Ngày giờ hiện bên phải tên (vd: 23:56, Mon, 26/10/26). Gõ là đổi ngay.'},
+  {icon:'🔢',label:'Chưa đọc',desc:'Số tin chưa đọc hiện trong vòng tròn bên phải (0 = ẩn).'},
+];
+const QLACT=[
+  {q:'lname',icon:'✏️',label:'Sửa tên',desc:'Sửa tên ngay trên màn hình danh sách. Enter để lưu, Esc để huỷ.'},
+  {q:'ltext',icon:'💬',label:'Nội dung',desc:'Sửa dòng tin nhắn cuối hiện dưới tên, ngay trên màn hình.'},
+  {q:'lav',icon:'🎲',label:'Avatar',desc:'Tạo avatar ngẫu nhiên; bấm tiếp để đổi cái khác.'},
+  {q:'lbadge',icon:'🏅',label:'Huy hiệu',desc:'Mở/đóng hàng 10 huy hiệu (tích xanh, Premium, emoji…) để chọn nhanh; ✕ để bỏ huy hiệu.'},
+  {q:'ltick',icon:'✓',label:'Dấu tick',desc:'Bấm để đổi vòng: không có → ✓ đã gửi → ✓✓ đã xem.'},
+  {q:'lhl',icon:'🔵',label:'Nổi bật',desc:'Bấm để đổi vòng nền của dòng: bình thường → đang chọn (nền xanh) → nhạt.'},
+  {q:'lpin',icon:'📌',label:'Ghim',desc:'Bật/tắt biểu tượng ghim (hiện khi không có tin chưa đọc).'},
+  {q:'lmute',icon:'🔇',label:'Tắt TB',desc:'Bật/tắt biểu tượng tắt thông báo sau tên; số chưa đọc chuyển màu xám.'},
+  {q:'lonline',icon:'🟢',label:'Online',desc:'Bật/tắt chấm xanh online trên avatar.'},
+  {q:'ldup',icon:'⧉',label:'Nhân bản',desc:'Tạo bản sao của dòng này ngay bên dưới.'},
+  {q:'ldel',icon:'🗑️',label:'Xoá',desc:'Xoá dòng này. Lỡ tay thì bấm “↶ Hoàn tác”.',danger:true},
+  {q:'lmore',icon:'⚙️',label:'Chi tiết',desc:'Mở form đầy đủ: loại tin cuối (Photo, tệp, cuộc gọi…), tiền tố, ảnh thu nhỏ, màu avatar…'},
+];
+let qBadgeOpen=false;
+const lBadgeKey=it=>it.badge==='verified'?':verified:':it.badge==='premium'?':premium:':it.badge==='custom'?it.badgeText:'';
+function applyLBadge(it,v){
+  if(v===':verified:') it.badge='verified'; else if(v===':premium:') it.badge='premium';
+  else if(v){it.badge='custom';it.badgeText=v} else {it.badge='none';it.badgeText=''}
+}
+function renderLQbar(){
+  const q=$('#qbar'), it=getL(lsel);
+  if(!it){q.hidden=true;q.innerHTML='';return}
+  const icon={ltick:it.status==='read'?'✓✓':'✓',lhl:it.hl==='selected'?'🔵':it.hl==='hover'?'🔘':'⚪'};
+  const now={ltick:{none:'không có',sent:'✓ đã gửi',read:'✓✓ đã xem'}[it.status],lhl:{none:'bình thường',selected:'đang chọn (nền xanh)',hover:'nhạt'}[it.hl]};
+  const on={lpin:it.pinned,lmute:it.muted,lonline:it.online,lbadge:qBadgeOpen,ltick:it.status!=='none',lhl:it.hl!=='none'};
+  q.innerHTML=`<div class="qtop"><label for="qltime" style="color:inherit;font-size:12px" title="${esc(QLTOP[0].desc)}">🕑 Giờ</label><input id="qltime" class="qtime" data-lq="time" value="${esc(it.time)}">`+
+    `<label for="qlun" style="color:inherit;font-size:12px" title="${esc(QLTOP[1].desc)}">🔢 Chưa đọc</label><input id="qlun" class="qnum" type="number" min="0" data-lq="unread" value="${it.unread}">`+
+    `<button class="qhelp" data-q="help" title="Giải thích từng nút">❓ Hướng dẫn</button><button class="qx" data-lqa="close" title="Bỏ chọn (Esc)">✕ Đóng</button></div>`+
+    `<div class="qbtns l">${QLACT.map(a=>`<button data-lqa="${a.q}" class="${a.danger?'danger':''}${on[a.q]?' on':''}" title="${esc(a.desc+(now[a.q]?' Hiện tại: '+now[a.q]+'.':''))}" aria-label="${esc(a.label)}"><span${a.q==='ltick'&&it.status==='none'?' style="opacity:.35"':''}>${icon[a.q]||a.icon}</span><small>${esc(a.label)}</small></button>`).join('')}</div>`+
+    (qBadgeOpen?`<div class="qbadges">${badgePicker(lBadgeKey(it),'qlbadge')}</div>`:'');
+  placeQbar();
+}
 function renderQbar(){
+  if(view==='list'){renderLQbar();return}
   const q=$('#qbar'), m=getMsg(sel);
   if(!m){q.hidden=true;q.innerHTML='';return}
   const isDate=m.type==='date';
@@ -786,7 +884,10 @@ function renderQbar(){
   placeQbar();
 }
 function openHelp(){
-  $('#helpTable').innerHTML=[QTIME,...QACT].map(a=>`<tr><td class="ic">${a.icon}</td><td><b>${esc(a.label)}</b>${esc(a.desc)}</td></tr>`).join('')
+  const row=a=>`<tr><td class="ic">${a.icon}</td><td><b>${esc(a.label)}</b>${esc(a.desc)}</td></tr>`;
+  $('#helpTable').innerHTML=[QTIME,...QACT].map(row).join('')
+    +'<tr><td colspan="2" style="padding-top:14px"><b>Thanh sửa nhanh ở màn hình Danh sách chat</b><span class="hint">Chạm vào một dòng trong danh sách để hiện thanh này.</span></td></tr>'
+    +[...QLTOP,...QLACT].map(row).join('')
     +'<tr><td class="ic">❓</td><td><b>Hướng dẫn</b>Mở bảng giải thích này.</td></tr>';
   $('#help').hidden=false;$('#help .mbox').scrollTop=0;$('#helpTitle').focus({preventScroll:true});
 }
@@ -794,22 +895,28 @@ const closeHelp=()=>{$('#help').hidden=true};
 $('#btnHelp').onclick=openHelp;$('#helpClose').onclick=closeHelp;
 $('#help').addEventListener('click',e=>{if(e.target.id==='help') closeHelp()});
 function placeQbar(){
-  const q=$('#qbar'), m=getMsg(sel), row=m&&$(`#msgs [data-id="${sel}"]`);
+  const q=$('#qbar'), lm=view==='list';
+  const m=lm?getL(lsel):getMsg(sel), row=m&&$(lm?`#msgs [data-lid="${lsel}"]`:`#msgs [data-id="${sel}"]`);
   if(!row||!q.innerHTML){q.hidden=true;return}
-  const tgt=row.querySelector('.bubble,.sticker,span')||row;
+  const tgt=lm?row:(row.querySelector('.bubble,.sticker,span')||row);
   const wrap=$('.devwrap').getBoundingClientRect(), scr=$('#screen').getBoundingClientRect(), r=tgt.getBoundingClientRect();
-  if(r.bottom<scr.top+70||r.top>scr.bottom-10){q.hidden=true;return}
+  if(r.bottom<scr.top+(lm?30:70)||r.top>scr.bottom-10){q.hidden=true;return}
   q.hidden=false;
   const ti=q.querySelector('.qtime'); if(ti&&document.activeElement!==ti) ti.value=m.time;
+  const un=q.querySelector('.qnum'); if(un&&document.activeElement!==un) un.value=m.unread;
   const qh=q.offsetHeight, qw=q.offsetWidth;
   let top=r.bottom-wrap.top+6;
   if(r.bottom+6+qh>Math.min(scr.bottom,window.innerHeight)-4) top=r.top-wrap.top-qh-6;  // không đủ chỗ phía dưới → lật lên trên
   top=Math.max(scr.top-wrap.top+4,Math.min(top,scr.bottom-wrap.top-qh-4));
-  let left=m.from==='me'?r.right-wrap.left-qw:r.left-wrap.left;
+  let left=lm?(wrap.width-qw)/2:m.from==='me'?r.right-wrap.left-qw:r.left-wrap.left;
   left=Math.max(4,Math.min(left,wrap.width-qw-4));
   q.style.top=top+'px';q.style.left=left+'px';
 }
 $('#qbar').addEventListener('input',e=>{
+  const lk=e.target.dataset.lq;
+  if(lk){const it=getL(lsel);if(!it) return;
+    it[lk]=lk==='unread'?Math.max(0,parseInt(e.target.value)||0):e.target.value;
+    renderPhone();renderLlist();const f=$(`#lform [data-l="${lk}"]`);if(f) f.value=it[lk];save();return}
   if(!e.target.classList.contains('qtime')) return;
   const m=getMsg(sel);if(!m) return;
   m.time=e.target.value;renderPhone();renderList();
@@ -818,6 +925,7 @@ $('#qbar').addEventListener('input',e=>{
 });
 $('#qbar').addEventListener('click',e=>{
   const b=e.target.closest('button[data-q]');if(!b) return;
+  if(b.dataset.q==='help'){openHelp();return}
   const m=getMsg(sel);if(!m) return;
   const a=b.dataset.q;
   if(a==='edit'){
@@ -833,6 +941,28 @@ $('#qbar').addEventListener('click',e=>{
   if(a==='more') openForm();
   if(a==='close') deselect();
   if(a==='help') openHelp();
+});
+$('#qbar').addEventListener('click',e=>{
+  if(view!=='list') return;
+  const it=getL(lsel);if(!it) return;
+  const bb=e.target.closest('button[data-qlbadge]');
+  if(bb){applyLBadge(it,bb.dataset.qlbadge);renderPhone();renderLform();renderLQbar();save();return}
+  const b=e.target.closest('button[data-lqa]');if(!b) return;
+  const a=b.dataset.lqa;
+  if(a==='close'){deselectL();return}
+  if(a==='lname'||a==='ltext'){
+    const t=$(`#msgs [data-lid="${lsel}"]`)?.querySelector(a==='lname'?'.ln':'.ltx');
+    if(t) startInline(t,it,a==='lname'?'name':'text');return}
+  if(a==='lbadge'){qBadgeOpen=!qBadgeOpen;renderLQbar();return}
+  if(a==='ldup'||a==='ldel'){doLAct(a==='ldup'?'dup':'del');return}
+  if(a==='lmore'){showTab('lst');$('#lform').scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(a==='lav') it.avatar=randomAvatar();
+  if(a==='ltick') it.status={none:'sent',sent:'read',read:'none'}[it.status];
+  if(a==='lhl') it.hl={none:'selected',selected:'hover',hover:'none'}[it.hl];
+  if(a==='lpin') it.pinned=!it.pinned;
+  if(a==='lmute') it.muted=!it.muted;
+  if(a==='lonline') it.online=!it.online;
+  renderPhone();renderLlist();renderLform();renderLQbar();save();
 });
 function openForm(){showTab('msg');$('#form').scrollIntoView({behavior:'smooth',block:'start'})}
 function deselect(){
@@ -968,9 +1098,11 @@ function renderPeople(){
     <div class="pf">
       <div class="grid2"><label>Tên<input data-p="name" value="${esc(p.name)}"></label>
       <label>Màu tên${p.id==='me'?' (dùng cho trích dẫn)':''}<input type="color" data-p="color" value="${esc(p.color)}"></label></div>
-      ${p.id==='me'?'':`<label>Huy hiệu sau tên (vd: ★, ✔, 👑)<input data-p="badge" value="${esc(p.badge)}"></label>`}
+      ${p.id==='me'?'':`<div><span class="hint" style="display:block;margin:0">Huy hiệu sau tên – bấm để chọn</span>${badgePicker(p.badge,'pbadge')}
+        <input data-p="badge" value="${p.badge&&p.badge[0]!==':'?esc(p.badge):''}" placeholder="hoặc gõ emoji / chữ tuỳ ý" style="margin-top:6px"></div>`}
       <div class="row-btns" style="margin-top:2px">
-        <label class="file">Ảnh đại diện<input type="file" accept="image/*" data-pfile="1"></label>
+        <label class="file">📷 Ảnh đại diện<input type="file" accept="image/*" data-pfile="1"></label>
+        <button data-pact="randav" title="Tạo avatar ngẫu nhiên – bấm tiếp để đổi">🎲 Ngẫu nhiên</button>
         ${p.avatar?'<button data-pact="rmav">Xoá ảnh</button>':''}
         ${p.id==='me'?'<span class="tag" style="align-self:center">Bạn · tin bên phải</span>':'<button class="danger" data-pact="rm">Xoá người</button>'}
       </div>
@@ -983,17 +1115,24 @@ pBox.addEventListener('input',e=>{
   const p=S.people.find(x=>x.id===e.target.closest('[data-pid]').dataset.pid);
   const old=p.name; p[k]=e.target.value;
   if(k==='name') S.messages.forEach(m=>{if(m.replyName===old) m.replyName=p.name});
+  if(k==='badge') e.target.closest('[data-pid]').querySelectorAll('[data-pbadge]').forEach(x=>x.classList.toggle('on',x.dataset.pbadge===p.badge&&p.badge!==''));
   renderPhone();renderList();renderCompose();save();
 });
 pBox.addEventListener('change',e=>{
   const p=S.people.find(x=>x.id===e.target.closest('[data-pid]')?.dataset.pid);if(!p) return;
   if(e.target.dataset.pfile) readImg(e.target.files[0],256,url=>{p.avatar=url;renderPeople();renderPhone();renderCompose();save()});
-  if(e.target.dataset.p) {renderPeople();renderForm()}
+  if(e.target.dataset.p){   // cập nhật tại chỗ, không vẽ lại cả thẻ (tránh nuốt mất cú bấm kế tiếp)
+    const av=e.target.closest('.pcard').querySelector(':scope>div');if(av) av.innerHTML=avatarHTML(p,44);
+    renderForm();
+  }
 });
 pBox.addEventListener('click',e=>{
+  const bb=e.target.closest('button[data-pbadge]');
+  if(bb){const p=S.people.find(x=>x.id===bb.closest('[data-pid]').dataset.pid);p.badge=bb.dataset.pbadge;renderPeople();renderPhone();save();return}
   const b=e.target.closest('button[data-pact]');if(!b) return;
   const p=S.people.find(x=>x.id===b.closest('[data-pid]').dataset.pid);
   if(b.dataset.pact==='rmav') p.avatar='';
+  if(b.dataset.pact==='randav') p.avatar=randomAvatar();
   if(b.dataset.pact==='rm'){
     const n=S.messages.filter(m=>m.from===p.id&&m.type!=='date').length;
     if(!confirm(`Xoá “${p.name}”${n?` và ${n} tin nhắn của người này`:''}?`)) return;
@@ -1035,7 +1174,7 @@ function renderChatForm(){
     else if(t==='select') grid.push(`<label>${l}<select data-c="${k}">${opts([['dark','🌙 Tối'],['light','☀️ Sáng']],c[k])}</select></label>`);
     else if(t==='number') grid.push(`<label>${l}<input type="number" data-c="${k}" value="${esc(c[k])}"></label>`);
     else if(t==='check') grid.push(`<label class="chk" style="padding-top:4px"><input type="checkbox" data-c="${k}"${c[k]?' checked':''}> ${l}</label>`);
-    else if(t==='file') grid.push(`<div><span class="hint" style="display:block;margin:0 0 4px">${l}</span><div class="row-btns" style="margin:0"><label class="file">Chọn ảnh<input type="file" accept="image/*" data-cfile="${k}"></label>${c[k]?`<button data-cclear="${k}">Xoá</button>`:''}</div></div>`);
+    else if(t==='file') grid.push(`<div><span class="hint" style="display:block;margin:0 0 4px">${l}</span><div class="row-btns" style="margin:0"><label class="file">Chọn ảnh<input type="file" accept="image/*" data-cfile="${k}"></label>${k==='avatarImg'?`<button data-crand="${k}" title="Tạo avatar ngẫu nhiên">🎲 Ngẫu nhiên</button>`:''}${c[k]?`<button data-cclear="${k}">Xoá</button>`:''}</div></div>`);
   });
   flush();$('#chatForm').innerHTML=h;
   renderPresets();
@@ -1075,6 +1214,7 @@ $('#chatForm').addEventListener('change',e=>{
   readImg(e.target.files[0],k==='bgImg'?1400:256,url=>{S.chat[k]=url;renderChatForm();renderPhone();save()});
 });
 $('#chatForm').addEventListener('click',e=>{
+  const r=e.target.closest('[data-crand]');if(r){S.chat[r.dataset.crand]=randomAvatar();renderChatForm();renderPhone();save();return}
   const k=e.target.dataset?.cclear;if(!k) return;S.chat[k]='';renderChatForm();renderPhone();save();
 });
 
@@ -1197,7 +1337,7 @@ function setView(v){
   if(view===v){applyViewUI();return}
   view=v;try{localStorage.setItem('cms:view',v)}catch(e){}
   if(v==='list'){if(sel) deselect()} else if(lsel) deselectL();
-  applyViewUI();renderPhone(v==='list'?'top':'bottom');
+  renderQbar();applyViewUI();renderPhone(v==='list'?'top':'bottom');
 }
 function applyViewUI(){
   $$('.vswitch button').forEach(b=>{const on=b.dataset.v===view;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
@@ -1213,9 +1353,9 @@ function selectL(id,scroll){
   $$('#msgs [data-lid]').forEach(el=>el.classList.toggle('sel',el.dataset.lid===id));
   if(scroll){const el=$(`#msgs [data-lid="${id}"]`),sc=$('#scroller');if(el){sc.scrollTop=el.offsetTop-sc.clientHeight/2}
     $(`#llist [data-lid="${id}"]`)?.scrollIntoView({block:'nearest'})}
-  if(innerWidth<900&&!scroll) $('#lform').scrollIntoView({behavior:'smooth',block:'start'});
+  qBadgeOpen=false;renderLQbar();
 }
-function deselectL(){lsel=null;renderLlist();renderLform();$$('#msgs .lrow.sel').forEach(el=>el.classList.remove('sel'))}
+function deselectL(){lsel=null;qBadgeOpen=false;renderLlist();renderLform();renderLQbar();$$('#msgs .lrow.sel').forEach(el=>el.classList.remove('sel'))}
 function renderLlist(){
   $('#llist').innerHTML=S.list.items.map(it=>`<div class="li${it.id===lsel?' on':''}" data-lid="${it.id}"><span class="who" style="color:${it.color}">${esc(it.name||'(không tên)')}</span><span class="sn">${esc((it.prefix?it.prefix+' ':'')+lPreviewText(it))}</span><span class="tm">${esc(it.time)}</span></div>`).join('')
     ||'<p class="hint" style="padding:8px 10px">Danh sách trống.</p>';
@@ -1228,11 +1368,11 @@ function renderLform(){
   <div class="pcard" style="margin:10px 0 0"><div>${avatarHTML({id:'l',name:it.name,color:it.color,avatar:it.avatar},48)}</div>
     <div class="pf">
       <div class="grid2"><label>Tên<input data-l="name" value="${esc(it.name)}"></label><label>Màu avatar (khi không có ảnh)<input type="color" data-l="color" value="${esc(it.color)}"></label></div>
-      <div class="row-btns" style="margin:0"><label class="file">📷 Ảnh đại diện<input type="file" accept="image/*" data-lfile="avatar"></label>${it.avatar?'<button data-lact="rmavatar">Xoá ảnh</button>':''}</div>
+      <div class="row-btns" style="margin:0"><label class="file">📷 Ảnh đại diện<input type="file" accept="image/*" data-lfile="avatar"></label><button data-lact="randav" title="Tạo avatar ngẫu nhiên – bấm tiếp để đổi">🎲 Ngẫu nhiên</button>${it.avatar?'<button data-lact="rmavatar">Xoá ảnh</button>':''}</div>
     </div></div>
   <div class="grid2">
-    <label>Huy hiệu sau tên<select data-l="badge">${opts([['none','Không có'],['verified','✔ Tích xanh'],['custom','Tuỳ chọn (emoji/chữ)']],it.badge)}</select></label>
-    ${it.badge==='custom'?`<label>Huy hiệu tuỳ chọn<input data-l="badgeText" value="${esc(it.badgeText)}" placeholder="vd: ⭐ 👑 🟢"></label>`:'<span></span>'}
+    <div style="grid-column:1/-1"><span class="hint" style="display:block;margin:0">Huy hiệu sau tên – bấm để chọn</span>${badgePicker(it.badge==='verified'?':verified:':it.badge==='premium'?':premium:':it.badge==='custom'?it.badgeText:'','lbadge')}
+      <input data-l="badgeText" value="${it.badge==='custom'?esc(it.badgeText):''}" placeholder="hoặc gõ emoji / chữ tuỳ ý" style="margin-top:6px"></div>
     <label>Ngày / giờ (vd: 23:56, Mon, 26/10/26)<input data-l="time" value="${esc(it.time)}"></label>
     <label>Dấu tick (tin của bạn)<select data-l="status">${opts([['none','Không hiện'],['sent','✓ Đã gửi'],['read','✓✓ Đã xem']],it.status)}</select></label>
     <label>Loại tin cuối<select data-l="type">${opts([['text','Văn bản'],['photo','Ảnh (Photo)'],['file','Tệp đính kèm'],['call','Cuộc gọi'],['forward','Tin chuyển tiếp'],['draft','Bản nháp (Draft)'],['typing','Đang gõ…']],it.type)}</select></label>
@@ -1256,6 +1396,7 @@ const lf=$('#lform');
 lf.addEventListener('input',e=>{
   const k=e.target.dataset.l, it=getL(lsel);if(!k||!it) return;
   it[k]=e.target.type==='checkbox'?e.target.checked:e.target.type==='number'?Math.max(0,parseInt(e.target.value)||0):e.target.value;
+  if(k==='badgeText'){it.badge=it.badgeText?'custom':'none';lf.querySelectorAll('[data-lbadge]').forEach(x=>x.classList.toggle('on',!!it.badgeText&&x.dataset.lbadge===it.badgeText))}
   renderPhone();renderLlist();save();
   if(k==='badge'||k==='type') renderLform();
   if(k==='name'||k==='color'){const av=lf.querySelector('.pcard>div');if(av) av.innerHTML=avatarHTML({id:'l',name:it.name,color:it.color,avatar:it.avatar},48)}
@@ -1265,16 +1406,21 @@ lf.addEventListener('change',e=>{
   readImg(e.target.files[0],k==='avatar'?256:128,url=>{it[k]=url;renderPhone();renderLform();save()});
 });
 lf.addEventListener('click',e=>{
-  const b=e.target.closest('button[data-lact]');if(!b) return;
-  const a=b.dataset.lact, L=S.list.items, i=L.findIndex(x=>x.id===lsel);if(i<0) return;
+  const bb=e.target.closest('button[data-lbadge]'), cur=getL(lsel);
+  if(bb&&cur){applyLBadge(cur,bb.dataset.lbadge);renderPhone();renderLform();renderLQbar();save();return}
+  const b=e.target.closest('button[data-lact]');if(b) doLAct(b.dataset.lact);
+});
+function doLAct(a){
+  const L=S.list.items, i=L.findIndex(x=>x.id===lsel);if(i<0) return;
   if(a==='up'&&i>0){[L[i-1],L[i]]=[L[i],L[i-1]]}
   if(a==='down'&&i<L.length-1){[L[i+1],L[i]]=[L[i],L[i+1]]}
   if(a==='dup'){const c={...L[i],id:uid(),hl:'none'};L.splice(i+1,0,c);lsel=c.id}
   if(a==='del'){L.splice(i,1);lsel=(L[i]||L[i-1]||{}).id||null}
   if(a==='rmavatar') L[i].avatar='';
+  if(a==='randav') L[i].avatar=randomAvatar();
   if(a==='rmthumb') L[i].thumb='';
-  renderPhone();renderLlist();renderLform();save();
-});
+  renderPhone();renderLlist();renderLform();renderLQbar();save();
+}
 function addListItem(){
   setView('list');
   const L=S.list.items, i=L.findIndex(x=>x.id===lsel);
