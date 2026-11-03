@@ -263,7 +263,11 @@ button:disabled{opacity:.45;cursor:default}
 .hl-selected .lon{border-color:var(--l-sel)}.hl-hover .lon{border-color:var(--l-hov)}
 .lbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .l1,.l2{display:flex;align-items:center;gap:5px;min-width:0}
-.ln{font-weight:600;font-size:16px;line-height:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ln{font-weight:600;font-size:16px;line-height:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;unicode-bidi:plaintext}
+.lbulk{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center}
+.lbulk #bulkNames{grid-column:1/-1;justify-content:center}
+.lbulk select{height:34px;padding:0 8px;min-width:0}
+.lbulk .chk{padding:0;font-size:12.5px}
 .lbadge{flex:none;font-size:15px;line-height:1}
 .lver{flex:none;display:block}
 .lmute{flex:none;color:var(--l-sub)}
@@ -319,6 +323,17 @@ button:disabled{opacity:.45;cursor:default}
 
     <div class="lcomposer" id="lcomposer" hidden>
       <button class="primary" id="addL2">＋ Thêm cuộc trò chuyện vào danh sách</button>
+      <div class="lbulk">
+        <button id="bulkNames" title="Đặt tên ngẫu nhiên, không trùng nhau, cho tất cả các dòng trong danh sách">🌍 Người ngẫu nhiên hàng loạt</button>
+        <select id="bulkRegion" aria-label="Khu vực tên" title="Lấy tên từ khu vực nào">
+          <option value="all">🌍 Toàn thế giới</option>
+          <option value="vn">🇻🇳 Việt Nam</option>
+          <option value="asia">🌏 Châu Á (Trung, Nhật, Hàn, Thái…)</option>
+          <option value="west">🌎 Âu – Mỹ – Nga</option>
+          <option value="arab">🕌 Ả Rập</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="bulkAv"> kèm avatar ngẫu nhiên</label>
+      </div>
       <p class="hint" style="margin:0">Chạm vào một dòng để sửa ở khung bên phải. Nhấp đúp vào <b>tên</b>, <b>nội dung</b> hoặc <b>giờ</b> để sửa ngay trên màn hình.</p>
     </div>
     <div class="composer">
@@ -385,7 +400,7 @@ button:disabled{opacity:.45;cursor:default}
 
     <div class="pane" id="pane-lst">
       <div id="llist"></div>
-      <div class="row-btns"><button id="addL">＋ Thêm cuộc trò chuyện</button></div>
+      <div class="row-btns"><button id="addL">＋ Thêm cuộc trò chuyện</button><button id="bulkNames2" title="Đặt tên ngẫu nhiên cho tất cả các dòng (chọn khu vực ở dưới khung chat)">🌍 Người ngẫu nhiên hàng loạt</button></div>
       <div id="lform"></div>
       <div class="sect">Giao diện danh sách</div>
       <div class="presets" id="lpresets"></div>
@@ -433,6 +448,7 @@ button:disabled{opacity:.45;cursor:default}
   <h3>Màn hình danh sách chat</h3>
   <table>
     <tr><td class="ic">📋</td><td><b>Danh sách chat</b>Bấm “📋 Danh sách chat” ở trên khung (hoặc tab “Danh sách chat”) để chuyển sang màn hình danh sách. Chạm vào một dòng để sửa tên, ảnh, nội dung, ngày giờ, dấu tick, số tin chưa đọc… ở khung bên phải. Nhấp đúp vào tên, nội dung hoặc giờ để sửa ngay trên màn hình.</td></tr>
+    <tr><td class="ic">🌍</td><td><b>Người ngẫu nhiên hàng loạt</b>Ở dưới khung (màn hình Danh sách chat) hoặc trong tab “Danh sách chat”: đặt tên ngẫu nhiên, không trùng nhau, cho tất cả các dòng. Chọn khu vực tên (toàn thế giới, Việt Nam, châu Á, Âu–Mỹ–Nga, Ả Rập) và tuỳ chọn kèm avatar ngẫu nhiên. Không ưng thì bấm lại hoặc ↶ Hoàn tác. Nút 🎲 cạnh ô Tên đổi tên riêng một dòng.</td></tr>
     <tr><td class="ic">🎨</td><td><b>Giao diện danh sách</b>Cuối tab “Danh sách chat”: chọn bộ màu có sẵn, bật/tắt thanh tiêu đề, đổi màu nền, màu dòng được chọn, màu nhấn.</td></tr>
   </table>
   <h3>Avatar &amp; huy hiệu</h3>
@@ -692,6 +708,50 @@ function randomAvatar(){
     if(!any) g.fillRect(o+2*s,o+2*s,s,s);
   }
   return c.toDataURL('image/png');
+}
+/* ---------- Tên ngẫu nhiên khắp thế giới (ghép họ + tên ngẫu nhiên, không phải người thật cụ thể) ---------- */
+const W_=t=>t.split(' ');
+const NAMEDATA={
+  vn:{l:W_('Nguyễn Trần Lê Phạm Hoàng Huỳnh Phan Vũ Võ Đặng Bùi Đỗ Hồ Ngô Dương Lý'),
+      g:['Minh Anh','Thu Trang','Quốc Bảo','Gia Huy','Ngọc Lan','Đức Thắng','Hải Yến','Tuấn Kiệt','Thảo Vy','Khánh Linh','Văn Hùng','Phương Thảo','Bảo Ngọc','Hoàng Long','Mai Chi','Thanh Tùng']},
+  en:{f:W_('James Olivia Liam Emma Noah Ava Ethan Sophia Mason Isabella Lucas Mia Benjamin Charlotte Henry Amelia Jack Harper'),l:W_('Smith Johnson Brown Taylor Miller Wilson Moore Clark Walker Hall Young King Wright Scott')},
+  es:{f:W_('Mateo Valentina Santiago Camila Diego Lucía Javier Sofía Alejandro Isabel Carlos Daniela'),l:W_('García Rodríguez Martínez López Hernández González Pérez Sánchez Ramírez Torres Flores')},
+  pt:{f:W_('João Ana Pedro Beatriz Gabriel Larissa Rafael Mariana'),l:W_('Silva Santos Oliveira Souza Costa Ferreira Almeida Lima')},
+  fr:{f:W_('Lucas Chloé Hugo Léa Louis Manon Jules Camille Théo Inès'),l:W_('Martin Bernard Dubois Moreau Laurent Lefèvre Girard Fournier')},
+  de:{f:W_('Lukas Hannah Felix Lena Maximilian Emilia Jonas Sophie'),l:W_('Müller Schmidt Schneider Fischer Weber Wagner Becker Hoffmann')},
+  it:{f:W_('Lorenzo Giulia Alessandro Chiara Matteo Francesca Leonardo Martina'),l:W_('Rossi Russo Ferrari Esposito Bianchi Romano Colombo Ricci')},
+  tr:{f:W_('Emre Zeynep Mehmet Elif Can Ayşe Burak Selin'),l:W_('Yılmaz Kaya Demir Şahin Çelik Aydın Öztürk Arslan')},
+  in:{f:W_('Aarav Priya Arjun Ananya Rohan Diya Vikram Kavya Rahul Sneha'),l:W_('Sharma Patel Singh Kumar Gupta Reddy Iyer Nair')},
+  id:{f:W_('Budi Siti Agus Dewi Rizky Putri Andi Ayu'),l:W_('Santoso Wijaya Pratama Saputra Hidayat Kusuma')},
+  ru:{m:W_('Алексей Дмитрий Иван Сергей Никита Михаил'),w:W_('Мария Анна Екатерина Ольга Дарья Наталья'),l:W_('Иванов Смирнов Кузнецов Попов Соколов Волков Лебедев Морозов')},
+  cn:{l:W_('王 李 张 刘 陈 杨 黄 赵 周 吴 徐 孙 林 郭'),g:W_('伟 芳 娜 敏 静 强 磊 洋 杰 婷 浩然 子涵 欣怡 宇轩 梓萱 俊杰 雨桐 思远')},
+  jp:{l:W_('佐藤 鈴木 高橋 田中 伊藤 渡辺 山本 中村 小林 加藤'),g:W_('翔太 美咲 大輝 結衣 蓮 陽菜 悠真 さくら 健太 愛')},
+  kr:{l:W_('김 이 박 최 정 강 조 윤 장 임 한'),g:W_('민준 서연 지훈 하은 도윤 지우 서준 수아 현우 지민 예린')},
+  th:{g:W_('สมชาย สมหญิง ณัฐพล กมลชนก ปิยะ วรรณา ธนา อรุณี')},
+  ar:{f:W_('محمد أحمد فاطمة عائشة علي مريم عمر ليلى يوسف نور خالد سارة'),l:W_('العلي الحسن السيد الخطيب المصري الشامي حداد منصور')},
+};
+const NAMEGEN={
+  vn:()=>{const d=NAMEDATA.vn,g=pick(d.g);return Math.random()<.35?g.split(' ').pop():`${pick(d.l)} ${g}`},
+  ru:()=>{const d=NAMEDATA.ru,w=Math.random()<.5,f=pick(w?d.w:d.m);return Math.random()<.3?f:`${f} ${pick(d.l)}${w?'а':''}`},
+  cn:()=>pick(NAMEDATA.cn.l)+pick(NAMEDATA.cn.g),
+  kr:()=>pick(NAMEDATA.kr.l)+pick(NAMEDATA.kr.g),
+  jp:()=>`${pick(NAMEDATA.jp.l)} ${pick(NAMEDATA.jp.g)}`,
+  th:()=>pick(NAMEDATA.th.g),
+};
+['en','es','pt','fr','de','it','tr','in','id','ar'].forEach(k=>{NAMEGEN[k]=()=>{const d=NAMEDATA[k],f=pick(d.f);return Math.random()<.25?f:`${f} ${pick(d.l)}`}});
+const NAME_REGIONS={all:Object.keys(NAMEGEN),vn:['vn'],asia:['cn','jp','kr','th','id','in','vn'],west:['en','es','pt','fr','de','it','tr','ru'],arab:['ar']};
+const AV_COLORS=['#8b6cf0','#e9905a','#5a7de9','#e55f8a','#4fb37e','#5aa7e9','#4cb0c4','#d8a14a','#6cbf5a','#c46be0','#e06b6b','#3fa7a0'];
+function genName(region){return NAMEGEN[pick(NAME_REGIONS[region]||NAME_REGIONS.all)]()}
+function bulkRandomNames(){
+  const L=S.list.items;
+  if(!L.length){alert('Danh sách đang trống – hãy thêm vài dòng trước.');return}
+  const region=$('#bulkRegion').value, withAv=$('#bulkAv').checked, used=new Set();
+  L.forEach(it=>{
+    let n,t=0;do{n=genName(region)}while(used.has(n)&&++t<30);used.add(n);
+    it.name=n;it.color=pick(AV_COLORS);
+    if(withAv) it.avatar=randomAvatar();
+  });
+  setView('list');renderPhone();renderLlist();renderLform();renderLQbar();save();
 }
 const LICON={
   verified:'<svg class="lver" width="19" height="19" viewBox="0 0 24 24"><path fill="var(--l-acc)" d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -1367,7 +1427,7 @@ function renderLform(){
   box.innerHTML=`
   <div class="pcard" style="margin:10px 0 0"><div>${avatarHTML({id:'l',name:it.name,color:it.color,avatar:it.avatar},48)}</div>
     <div class="pf">
-      <div class="grid2"><label>Tên<input data-l="name" value="${esc(it.name)}"></label><label>Màu avatar (khi không có ảnh)<input type="color" data-l="color" value="${esc(it.color)}"></label></div>
+      <div class="grid2"><label>Tên<span style="display:flex;gap:6px;margin-top:4px"><input data-l="name" value="${esc(it.name)}" style="margin:0"><button type="button" data-lact="randname" title="Tên ngẫu nhiên (theo khu vực đang chọn)">🎲</button></span></label><label>Màu avatar (khi không có ảnh)<input type="color" data-l="color" value="${esc(it.color)}"></label></div>
       <div class="row-btns" style="margin:0"><label class="file">📷 Ảnh đại diện<input type="file" accept="image/*" data-lfile="avatar"></label><button data-lact="randav" title="Tạo avatar ngẫu nhiên – bấm tiếp để đổi">🎲 Ngẫu nhiên</button>${it.avatar?'<button data-lact="rmavatar">Xoá ảnh</button>':''}</div>
     </div></div>
   <div class="grid2">
@@ -1418,6 +1478,7 @@ function doLAct(a){
   if(a==='del'){L.splice(i,1);lsel=(L[i]||L[i-1]||{}).id||null}
   if(a==='rmavatar') L[i].avatar='';
   if(a==='randav') L[i].avatar=randomAvatar();
+  if(a==='randname') L[i].name=genName($('#bulkRegion').value);
   if(a==='rmthumb') L[i].thumb='';
   renderPhone();renderLlist();renderLform();renderLQbar();save();
 }
@@ -1428,7 +1489,8 @@ function addListItem(){
   L.splice(i>=0?i+1:L.length,0,it);
   renderPhone();save();selectL(it.id,true);
 }
-$('#addL').onclick=addListItem;$('#addL2').onclick=addListItem;
+$('#addL').onclick=addListItem;
+$('#bulkNames').onclick=bulkRandomNames;$('#bulkNames2').onclick=bulkRandomNames;$('#addL2').onclick=addListItem;
 const LSF=[['showHeader','Hiện thanh tiêu đề (Edit · Chats · ✎)','check'],['title','Tiêu đề','text'],['leftText','Chữ bên trái','text'],
   ['bg','Màu nền','color'],['selBg','Nền dòng đang chọn','color'],['hoverBg','Nền dòng nhạt','color'],
   ['accent','Màu nhấn (tick, Photo, tích xanh)','color'],['nameColor','Màu tên','color'],['subColor','Màu chữ phụ (nội dung, giờ)','color']];
