@@ -462,7 +462,7 @@ def draw_plan_image(data, a, now, path):
     for name, y, col in (("SL", p["sl"], down), ("TP1", p["tp1"], up), ("TP2", p["tp2"], up)):
         ax.hlines(y, n - 62, xmax, color=col, linestyle=(0, (5, 4)), linewidth=1)
         ax.text(n - 62, y + span * 0.008, f"{name} {k_fmt(y)}", color=col, fontsize=10, fontweight="bold",
-                va="bottom")
+                va="bottom", zorder=6, bbox=dict(boxstyle="round,pad=0.15", facecolor=bg, edgecolor="none", alpha=0.85))
 
     # scenario arrow: retrace into the zone, then continue in the bias direction
     x0, x1, x2 = n + 1, n + 9, n + 21
