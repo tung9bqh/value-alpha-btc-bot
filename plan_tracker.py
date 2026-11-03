@@ -20,8 +20,18 @@ from datetime import datetime, timedelta
 
 import btc_daily_bot as bot
 
-WINDOW = 24 * 3600
-FINALIZE_SLACK = 30 * 60  # the next morning's run may start a few minutes before 24h is up
+WINDOW = 24 * 3600  # validity of plans saved before sessions existed
+FINALIZE_SLACK = 30 * 60  # the next post may start a few minutes before the plan expires
+# session -> (label, icon, local time the plan expires)
+SESSIONS = {"asia": ("ASIA/EU SESSION", "🌅", (19, 0)), "us": ("US SESSION", "🌙", (8, 30))}
+
+
+def session_of(plan):
+    return plan.get("session", "asia")
+
+
+def expires_at(plan):
+    return plan.get("expires_at") or plan["posted_at"] + WINDOW
 
 
 # ---------------------------------------------------------------- state
@@ -35,16 +45,20 @@ def load_plans(state_dir):
     if not os.path.isdir(d):
         return []
     plans = []
-    for name in sorted(os.listdir(d)):
+    for name in os.listdir(d):
         if name.endswith(".json"):
             with open(os.path.join(d, name)) as f:
                 plans.append(json.load(f))
-    return plans
+    return sorted(plans, key=lambda p: p["posted_at"])
+
+
+def plan_filename(date, session):
+    return f"{date}{'-us' if session == 'us' else ''}.json"
 
 
 def save_plan(state_dir, plan):
     os.makedirs(plans_dir(state_dir), exist_ok=True)
-    with open(os.path.join(plans_dir(state_dir), f"{plan['date']}.json"), "w") as f:
+    with open(os.path.join(plans_dir(state_dir), plan_filename(plan["date"], session_of(plan))), "w") as f:
         json.dump(plan, f, indent=2)
 
 
@@ -62,10 +76,16 @@ def save_meta(state_dir, meta):
         json.dump(meta, f, indent=2)
 
 
-def new_plan(analysis, now, message_ids):
+def new_plan(analysis, now, message_ids, session="asia"):
+    """Plan record; it stays valid until the next session's post (asia -> 19:00, us -> 08:30)."""
     p = analysis["primary"]
+    h, m = SESSIONS[session][2]
+    end = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    while (end - now).total_seconds() < 2 * 3600:
+        end += timedelta(days=1)
     return {
-        "date": f"{now:%Y-%m-%d}", "posted_at": int(now.timestamp()), "direction": analysis["direction"],
+        "date": f"{now:%Y-%m-%d}", "session": session, "posted_at": int(now.timestamp()),
+        "expires_at": int(end.timestamp()), "direction": analysis["direction"],
         **{k: round(p[k], 2) for k in ("lo", "hi", "entry", "sl", "tp1", "tp2", "cancel")},
         "message_ids": message_ids, "alerts_sent": [], "recap_sent": False, "result": None,
     }
@@ -81,7 +101,7 @@ def replay(plan, m15, now_ts):
     # R earned by each half: from the plan's own prices, so old and new TP/SL settings both work.
     HALF_TP1, HALF_TP2 = 0.5 * abs(tp1 - entry) / risk, 0.5 * abs(tp2 - entry) / risk
     start = plan["posted_at"] - plan["posted_at"] % 900
-    end = min(now_ts, plan["posted_at"] + WINDOW)
+    end = min(now_ts, expires_at(plan))
 
     def against(c, level):  # price moved against the trade direction far enough to touch level
         return c["h"] >= level if side == -1 else c["l"] <= level
@@ -97,7 +117,7 @@ def replay(plan, m15, now_ts):
 
     candles = [c for c in m15 if start <= c["t"] < end]
     if not candles or candles[0]["t"] > start + 900:
-        return {"status": "unknown", "r": None, "events": [], "final": now_ts >= plan["posted_at"] + WINDOW}
+        return {"status": "unknown", "r": None, "events": [], "final": now_ts >= expires_at(plan)}
 
     events, state, status, r = [], "waiting", None, None
     for c in candles:
@@ -151,7 +171,7 @@ def replay(plan, m15, now_ts):
                 status = "cancel_exit"
                 break
 
-    expired = now_ts >= plan["posted_at"] + WINDOW - FINALIZE_SLACK
+    expired = now_ts >= expires_at(plan) - FINALIZE_SLACK
     if status is None:
         if not expired:
             return {"status": "in_progress" if state != "waiting" else "waiting", "r": None,
@@ -223,8 +243,9 @@ EVENT_LABEL = {"entry": "Entry zone reached", "tp1": "TP1 hit", "tp2": "TP2 hit"
 def recap_text(plan, res):
     day = datetime.strptime(plan["date"], "%Y-%m-%d")
     short = plan["direction"] == "SHORT"
-    lines = [f"📋 <b>PLAN RESULT — {day:%B %d}</b>".upper().replace("<B>", "<b>").replace("</B>", "</b>"),
-             f"{'🔴' if short else '🟢'} {plan['direction'].title()} {bot.k_fmt(plan['lo'], 50)}–{bot.k_fmt(plan['hi'], 50)}",
+    label, icon, _ = SESSIONS[session_of(plan)]
+    lines = [f"📋 <b>PLAN RESULT — {day:%B %d} · {label}</b>".upper().replace("<B>", "<b>").replace("</B>", "</b>"),
+             f"{'🔴' if short else '🟢'} {plan['direction'].title()} {bot.k_fmt(plan['lo'])}–{bot.k_fmt(plan['hi'])}",
              f"Entry: {bot.k_fmt(plan['entry'])} | SL: {bot.k_fmt(plan['sl'])} | "
              f"TP1: {bot.k_fmt(plan['tp1'])} | TP2: {bot.k_fmt(plan['tp2'])}", ""]
     lines += [f"• {hhmm(e['t'])} {EVENT_LABEL[e['kind']]}" for e in res["events"]]
@@ -238,31 +259,47 @@ def recap_text(plan, res):
     return "\n".join(lines)
 
 
-def weekly_text(plans, monday):
-    week_start = monday - timedelta(days=7)
-    rows = [p for p in plans if p.get("result")
-            and week_start.date() <= datetime.strptime(p["date"], "%Y-%m-%d").date() < monday.date()]
-    if not rows:
-        return None
+def _stats(rows):
     traded = [p for p in rows if p["result"]["r"] is not None]
     wins = [p for p in traded if p["result"]["r"] > 0.001]
     losses = [p for p in traded if p["result"]["r"] < -0.001]
     net = sum(p["result"]["r"] for p in traded)
     rate = f"{len(wins) / (len(wins) + len(losses)) * 100:.0f}%" if wins or losses else "—"
+    return traded, wins, losses, net, rate
+
+
+def weekly_text(plans, monday):
+    """Last week's track record, split into the 08:30 (Asia/EU) and 19:00 (US) sessions."""
+    week_start = monday - timedelta(days=7)
+    rows = [p for p in plans if p.get("result")
+            and week_start.date() <= datetime.strptime(p["date"], "%Y-%m-%d").date() < monday.date()]
+    if not rows:
+        return None
     last_day = monday - timedelta(days=1)
     lines = [f"📊 <b>WEEKLY TRACK RECORD — {week_start:%b %d} – {last_day:%b %d}</b>".upper()
-             .replace("<B>", "<b>").replace("</B>", "</b>"),
-             "",
-             f"• Plans: {len(rows)} | Triggered: {len(traded)}",
-             f"• Wins: {len(wins)} | Losses: {len(losses)} | Breakeven: {len(traded) - len(wins) - len(losses)}",
-             f"• Win rate: {rate}",
-             f"• Net result: <b>{net:+.2f}R</b>",
-             ""]
-    for p in rows:
-        d = datetime.strptime(p["date"], "%Y-%m-%d")
-        r = p["result"]["r"]
-        res = "No trade" if r is None else f"{r:+.2f}R"
-        lines.append(f"{d:%a} {'🔴' if p['direction'] == 'SHORT' else '🟢'} {p['direction'].title()} — {res}")
+             .replace("<B>", "<b>").replace("</B>", "</b>")]
+    for session, (label, icon, (h, m)) in SESSIONS.items():
+        part = [p for p in rows if session_of(p) == session]
+        if not part:
+            continue
+        traded, wins, losses, net, rate = _stats(part)
+        when = "08:30" if session == "asia" else "19:00"
+        lines += ["", f"{icon} <b>{label} ({when})</b>",
+                  f"• Plans: {len(part)} | Triggered: {len(traded)}",
+                  f"• Wins: {len(wins)} | Losses: {len(losses)} | Breakeven: {len(traded) - len(wins) - len(losses)}",
+                  f"• Win rate: {rate} | Net: <b>{net:+.2f}R</b>"]
+    traded, wins, losses, net, rate = _stats(rows)
+    lines += ["", f"📈 <b>TOTAL: {net:+.2f}R</b> (win rate {rate})", ""]
+    days = sorted({p["date"] for p in rows})
+    for d in days:
+        cells = []
+        for session, (label, icon, _) in SESSIONS.items():
+            p = next((x for x in rows if x["date"] == d and session_of(x) == session), None)
+            if p:
+                r = p["result"]["r"]
+                cells.append(f"{icon} {'🔴' if p['direction'] == 'SHORT' else '🟢'} {p['direction'].title()} "
+                             f"{'No trade' if r is None else f'{r:+.2f}R'}")
+        lines.append(f"{datetime.strptime(d, '%Y-%m-%d'):%a}: " + " · ".join(cells))
     lines += ["", "<i>Every plan is counted, wins and losses. 1R = the stop-loss distance from entry.</i>"]
     return "\n".join(lines)
 
@@ -283,10 +320,12 @@ def reply_target(plan):
 
 # ------------------------------------------------------------ workflows
 
-def run_recaps(state_dir, m15, now, send):
+def run_recaps(state_dir, m15, now, send, post=True):
     """Finalize finished plans; recap the latest one and, on Mondays, the past week.
 
     `send(text, reply_to)` posts a message (or prints it on a dry run) and returns True on success.
+    With post=False (the 19:00 run, whose outlook already reports the morning plan) results are
+    stored and marked as recapped without posting anything.
     """
     plans = load_plans(state_dir)
     now_ts = int(now.timestamp())
@@ -299,9 +338,9 @@ def run_recaps(state_dir, m15, now, send):
             p["result"] = {"status": res["status"], "r": res["r"], "events": res["events"]}
         if not p.get("recap_sent"):
             finished.append(p)
-    for p in finished[:-1]:  # older backlog: keep the result, skip the post
+    for p in finished[:-1] if post else finished:  # backlog / silent run: keep the result, skip the post
         p["recap_sent"] = True
-    if finished:
+    if finished and post:
         latest = finished[-1]
         if send(recap_text(latest, latest["result"]), reply_target(latest)):
             latest["recap_sent"] = True
@@ -310,7 +349,7 @@ def run_recaps(state_dir, m15, now, send):
 
     meta = load_meta(state_dir)
     monday = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if now.weekday() == 0 and f"{monday:%Y-%m-%d}" not in meta["weekly_sent"]:
+    if post and now.weekday() == 0 and f"{monday:%Y-%m-%d}" not in meta["weekly_sent"]:
         text = weekly_text(plans, monday)
         if text and send(text, None):
             meta["weekly_sent"].append(f"{monday:%Y-%m-%d}")
@@ -321,7 +360,7 @@ def run_check(state_dir, m15, now, send):
     """Send alerts for new events of the plans that are still running."""
     now_ts = int(now.timestamp())
     for p in load_plans(state_dir):
-        if p.get("result") is not None or now_ts > p["posted_at"] + WINDOW:
+        if p.get("result") is not None or now_ts > expires_at(p):
             continue
         res = replay(p, m15, now_ts)
         new = [e for e in res["events"] if f"{e['kind']}@{e['t']}" not in p["alerts_sent"]]

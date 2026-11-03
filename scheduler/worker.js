@@ -1,22 +1,30 @@
 // Cloudflare Worker: on-time scheduler for the GitHub Actions bot.
 //
 // GitHub's own `schedule:` trigger is best-effort and was hours late (or skipped)
-// for this repo, so this worker's Cron Triggers start the workflows instead via
-// workflow_dispatch. The GitHub schedules stay as a backup; every workflow is
-// idempotent (once-per-day guards, de-duplicated alerts), so a double start is harmless.
+// for this repo, so this worker starts the workflows instead via workflow_dispatch.
+// One Cron Trigger fires every 5 minutes and the slot table below decides what runs,
+// so new times never need another trigger (the free plan allows only a few).
+// Every workflow is idempotent (once-per-day guards per session, de-duplicated alerts),
+// so the retry slots and GitHub's backup schedules can never cause a double post.
 
 const REPO = "tung9bqh/value-alpha-btc-bot";
 
-// cron (UTC, must match wrangler.toml) -> workflows to start.
-// The retry slots re-run a job that failed (exchange/feed hiccup, runner error); both
-// workflows post at most once per day, so a retry after a successful post does nothing.
-const JOBS = {
-  "30 1 * * *": [["btc-daily.yml", { dry_run: "false" }]],      // 08:30 Vietnam: daily plan + recap (posts ~08:30:20)
-  "40,55 1 * * *": [["btc-daily.yml", { dry_run: "false" }]],   // retries at 08:40 and 08:55
-  "0 5 * * *": [["econ-calendar.yml", { dry_run: "false" }]],   // 12:00 Vietnam: economic calendar
-  "10,25 5 * * *": [["econ-calendar.yml", { dry_run: "false" }]], // retries at 12:10 and 12:25
-  "*/5 * * * *": [["plan-alerts.yml", { dry_run: "false" }]],   // plan alerts every 5 minutes
+const DAILY = ["btc-daily.yml", { dry_run: "false", session: "asia" }];
+const US = ["btc-daily.yml", { dry_run: "false", session: "us" }];
+const ECON = ["econ-calendar.yml", { dry_run: "false" }];
+const ALERTS = ["plan-alerts.yml", { dry_run: "false" }];
+
+// "HH:MM" in UTC -> workflows. Vietnam time = UTC+7.
+const SLOTS = {
+  "01:30": [DAILY], "01:40": [DAILY], "01:55": [DAILY], // 08:30 plan (+ retries 08:40, 08:55)
+  "05:00": [ECON], "05:10": [ECON], "05:25": [ECON],    // 12:00 economic calendar (+ retries)
+  "12:00": [US], "12:10": [US], "12:25": [US],          // 19:00 US-session outlook (+ retries)
 };
+
+export function jobsAt(date) {
+  const hhmm = date.toISOString().slice(11, 16);
+  return [...(SLOTS[hhmm] || []), ALERTS];
+}
 
 async function dispatch(env, workflow, inputs) {
   const resp = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${workflow}/dispatches`, {
@@ -37,7 +45,7 @@ async function dispatch(env, workflow, inputs) {
 
 export default {
   async scheduled(event, env, ctx) {
-    for (const [workflow, inputs] of JOBS[event.cron] || []) {
+    for (const [workflow, inputs] of jobsAt(new Date(event.scheduledTime))) {
       ctx.waitUntil(dispatch(env, workflow, inputs));
     }
   },

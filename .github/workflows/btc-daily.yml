@@ -2,9 +2,10 @@ name: BTC Daily Strategy (EN channel)
 
 on:
   schedule:
-    # 01:10 UTC = 08:10 Vietnam time. GitHub cron often starts late, so the job
-    # starts early and the script waits until exactly 08:30 before posting.
+    # Backup only (the Cloudflare scheduler normally starts these on time).
+    # 01:10 / 11:40 UTC = 08:10 / 18:40 Vietnam time; the script waits until 08:30 / 19:00.
     - cron: "10 1 * * *"
+    - cron: "40 11 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -46,10 +47,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
             python btc_daily_bot.py --dry-run --state-dir state --session "${{ inputs.session || 'asia' }}" | tee preview.txt
+          elif [ "${{ github.event.schedule }}" = "40 11 * * *" ]; then
+            python btc_daily_bot.py --wait-until 19:00 --state-dir state --once-per-day --session us
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             python btc_daily_bot.py --wait-until 08:30 --state-dir state --once-per-day
           else
-            python btc_daily_bot.py --state-dir state --once-per-day
+            python btc_daily_bot.py --state-dir state --once-per-day --session "${{ inputs.session || 'asia' }}"
           fi
       - name: Save plan history
         if: always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)

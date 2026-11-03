@@ -3,6 +3,12 @@ name: Post NOW to EN channel
 # Manual button: posts today's BTC strategy to the English channel immediately.
 on:
   workflow_dispatch:
+    inputs:
+      session:
+        description: "asia = 08:30-style plan, us = 19:00 US-session outlook"
+        type: choice
+        options: [asia, us]
+        default: asia
 
 permissions:
   contents: write  # plan history on the 'state' branch
@@ -28,7 +34,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID_EN || '@valuealphacrypto' }}
-        run: python btc_daily_bot.py --state-dir state
+        run: python btc_daily_bot.py --state-dir state --session "${{ inputs.session }}"
       - name: Save plan history
         if: always()
         env:

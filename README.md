@@ -24,6 +24,14 @@ Không cần API key. Trọng số quyết định LONG/SHORT: H4 20%, H1 35%, M
 
 Tuỳ chỉnh qua biến môi trường: `SL_PCT` (mặc định `1.2`), `ALTCOIN_POOL` (danh sách coin để chọn ngẫu nhiên).
 
+## Bài phiên Mỹ 19:00 (tự động, từ 04/11/2026)
+- Ảnh plan M15 (nhãn **US SESSION**) + phân tích ngắn (~100–150 từ): giá đã đi bao nhiêu từ sáng, plan sáng ra sao,
+  vị trí so với EMA20/50/200 + RSI + động lượng, kháng cự/hỗ trợ, **nên Long/Short phiên Mỹ** kèm Entry/SL/TP và
+  mốc huỷ, tin đỏ trong đêm (từ lịch kinh tế).
+- Plan sáng có hiệu lực **08:30 → 19:00**, plan phiên Mỹ **19:00 → 08:30** hôm sau; cảnh báo trả lời vào đúng bài
+  của từng phiên. 19:00 không đăng tổng kết riêng (bài phiên Mỹ đã nói plan sáng); 08:30 tổng kết plan phiên Mỹ.
+- Thống kê tuần (thứ Hai) **tách riêng** phiên Á–Âu (08:30) và phiên Mỹ (19:00), kèm tổng.
+
 ## Theo dõi plan & tổng kết (tự động)
 - **Cảnh báo** (workflow *Plan alerts*): kiểm tra nến M15 **mỗi 5 phút** (cả ngày lẫn đêm) và
   **trả lời vào bài 8:30** khi: giá chạm Entry, TP1, TP2, SL, H1 đóng nến phá cấu trúc, hoặc giá chạy tới TP1
@@ -69,8 +77,8 @@ Worker đăng lên kênh và **trả lời TP1 / TP2 / SL vào đúng bài vào 
 ## Hẹn giờ đúng giờ bằng Cloudflare (`scheduler/`)
 Lịch `schedule:` của GitHub Actions không đảm bảo đúng giờ (có ngày trễ hàng giờ hoặc bỏ qua), nên một
 **Cloudflare Worker** (Cron Triggers, miễn phí) kích hoạt các workflow đúng giờ:
-08:30 bài plan, 12:00 lịch kinh tế, mỗi 5 phút kiểm tra cảnh báo; nếu lượt 08:30 / 12:00 lỗi thì tự chạy lại
-sau 10 và 25 phút. Lịch GitHub vẫn giữ làm dự phòng;
+08:30 bài plan, 12:00 lịch kinh tế, 19:00 bài phiên Mỹ, mỗi 5 phút kiểm tra cảnh báo; nếu lượt 08:30 / 12:00 /
+19:00 lỗi thì tự chạy lại sau 10 và 25 phút (1 Cron Trigger mỗi 5 phút, bảng giờ nằm trong `scheduler/worker.js`). Lịch GitHub vẫn giữ làm dự phòng;
 bot chỉ đăng plan / lịch kinh tế **một lần mỗi ngày** nên không bị trùng.
 - Cài: tạo token GitHub tại *Settings → Developer settings → Fine-grained tokens* (chỉ repo này,
   quyền **Actions: Read and write**), thêm vào secret repo `GH_DISPATCH_TOKEN`, rồi chạy

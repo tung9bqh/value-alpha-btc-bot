@@ -43,6 +43,7 @@ TP_PCTS = (float(os.environ.get("TP1_PCT", "1.0")), float(os.environ.get("TP2_PC
 ENTRY_DIST_PCT = 0.35  # entry this far from the current price, inside the analysed zone
 ZONE_HALF_PCT = 0.10   # zone = entry +/- this
 SR_NEAR_PCT = 0.40     # price within this of a support/resistance level counts as "at" the level
+US_SESSION_START = "2026-11-04"  # first day of the 19:00 US-session post
 USER_AGENT = "ValueAlphaBTCBot/3.0"
 
 # Display name -> (Bitget granularity, OKX bar, weight in the daily decision)
@@ -761,10 +762,14 @@ def main():
 
     def already_posted():
         today = f"{datetime.now(TZ):%Y-%m-%d}"
-        return bool(args.state_dir) and os.path.exists(os.path.join(args.state_dir, "plans", f"{today}.json"))
+        name = f"{today}{'-us' if args.session == 'us' else ''}.json"
+        return bool(args.state_dir) and os.path.exists(os.path.join(args.state_dir, "plans", name))
 
+    if args.session == "us" and not args.dry_run and f"{datetime.now(TZ):%Y-%m-%d}" < US_SESSION_START:
+        print(f"US-session posts start on {US_SESSION_START} - skipping.")
+        return 0
     if args.once_per_day and not args.dry_run and already_posted():
-        print("Today's plan was already posted - skipping.")
+        print(f"Today's {args.session} plan was already posted - skipping.")
         return 0
     if args.wait_until:
         wait_until(args.wait_until)
@@ -792,9 +797,6 @@ def main():
         print(f"\n[source {source}; {visible_len(text)} chars; image saved to {args.chart_out}]")
         return 0
 
-    if args.session == "us":
-        print("US-session posting is preview-only for now (use --dry-run).", file=sys.stderr)
-        return 2
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
@@ -802,14 +804,15 @@ def main():
         return 2
     if args.state_dir:
         import plan_tracker
-        try:  # a failed recap must never block the morning plan
-            plan_tracker.run_recaps(args.state_dir, data["M15"], now, plan_tracker.make_sender(False))
+        try:  # a failed recap must never block the plan; at 19:00 the outlook itself reports the morning plan
+            plan_tracker.run_recaps(args.state_dir, data["M15"], now, plan_tracker.make_sender(False),
+                                    post=args.session == "asia")
         except Exception as e:  # noqa: BLE001
             print(f"Recap failed: {e}", file=sys.stderr)
     ids = send_post(token, chat_id, text, args.chart_out)
     print(f"Posted message(s) {ids} to {chat_id} (data: {source})")
     if args.state_dir:
-        plan_tracker.save_plan(args.state_dir, plan_tracker.new_plan(analysis, now, ids))
+        plan_tracker.save_plan(args.state_dir, plan_tracker.new_plan(analysis, now, ids, session=args.session))
     return 0
 
 
