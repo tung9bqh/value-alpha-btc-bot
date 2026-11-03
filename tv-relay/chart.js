@@ -4,6 +4,10 @@
 
 export const CHART_WIDTH = 1280;
 export const CHART_HEIGHT = 820;
+// TP replies are taller: the profit sits in its own centered band above the
+// candles, so it never covers the chart.
+const PROFIT_BAND = 190;
+export const HIT_CHART_HEIGHT = CHART_HEIGHT + PROFIT_BAND;
 
 const BARS_BEFORE = 72;  // candles shown up to and including the signal bar
 const MIN_BEFORE = 24;   // ...shrunk to this when the trade ran long
@@ -79,8 +83,8 @@ export function chartHtml(candles, sig) {
   const pct = (v) => `${(Math.abs(v - sig.entry) / sig.entry * 100).toFixed(2)}%`;
   const isLong = sig.side === "LONG";
 
-  const W = CHART_WIDTH, H = CHART_HEIGHT;
-  const L = 24, R = W - 104, T = 92, B = H - 64;
+  const W = CHART_WIDTH, H = hit ? HIT_CHART_HEIGHT : CHART_HEIGHT;
+  const L = 24, R = W - 104, T = 92 + (hit ? PROFIT_BAND : 0), B = H - 64;
   const xStep = (R - L) / slots;
   const x = (i) => L + xStep * (i + 0.5);
 
@@ -190,15 +194,16 @@ export function chartHtml(candles, sig) {
     s.push(`<text x="${hlx + hw / 2}" y="${hly + 21}" fill="#06231a" font-size="16" font-weight="800" text-anchor="middle">${hl}</text>`);
 
     const p = profit({ side: sig.side, entry: sig.entry, exit: hit.price, lev: Number(sig.lev) || 1, margin: hit.margin });
-    // profit panel in the chart corner away from the price action
-    const pw = 360, ph = 150;
-    const startAbove = (bars[0].h + bars[0].l) / 2 < (hi + lo) / 2;
-    const pX = L + 16, pY = startAbove ? B - ph - 16 : T + 16;
-    s.push(`<rect x="${pX}" y="${pY}" width="${pw}" height="${ph}" rx="14" fill="#0b0f19" fill-opacity="0.9" stroke="${C.win}" stroke-opacity="0.55"/>`);
-    s.push(`<text x="${pX + 22}" y="${pY + 34}" fill="${C.axis}" font-size="15" font-weight="600" letter-spacing="1">${hl} · ${esc(sig.side)} ${sig.lev ? esc(sig.lev) + "X" : ""}</text>`);
-    s.push(`<text x="${pX + 20}" y="${pY + 92}" fill="${C.win}" font-size="56" font-weight="800">${signed(p.roi, 2)}%</text>`);
-    s.push(`<text x="${pX + 22}" y="${pY + 127}" fill="${C.win}" font-size="22" font-weight="600">${signed(p.pnl, 2)} USDT` +
-      `<tspan fill="${C.axis}" font-size="15" font-weight="400">  on ${money(hit.margin, 0)} USDT margin</tspan></text>`);
+    // profit band, centered between the header and the chart
+    const cx = W / 2, bw = 640, bh = PROFIT_BAND - 26, bx = cx - bw / 2, by = 92;
+    s.push(`<defs><linearGradient id="pg" x1="0" x2="1"><stop offset="0" stop-color="${C.win}" stop-opacity="0.04"/>` +
+      `<stop offset="0.5" stop-color="${C.win}" stop-opacity="0.16"/><stop offset="1" stop-color="${C.win}" stop-opacity="0.04"/></linearGradient></defs>`);
+    s.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="18" fill="url(#pg)" stroke="${C.win}" stroke-opacity="0.45"/>`);
+    s.push(`<text x="${cx}" y="${by + 36}" fill="${C.text}" font-size="17" font-weight="700" letter-spacing="2" text-anchor="middle">` +
+      `<tspan fill="${C.win}">${hl}</tspan>  ·  ${esc(sig.side)}${sig.lev ? ` ${esc(sig.lev)}X` : ""}  ·  ${signed(p.move, 2)}%</text>`);
+    s.push(`<text x="${cx}" y="${by + 112}" fill="${C.win}" font-size="80" font-weight="800" text-anchor="middle" letter-spacing="-1">ROI ${signed(p.roi, 2)}%</text>`);
+    s.push(`<text x="${cx}" y="${by + 150}" fill="${C.win}" font-size="26" font-weight="700" text-anchor="middle">${signed(p.pnl, 2)} USDT` +
+      `<tspan fill="${C.axis}" font-size="17" font-weight="400">   on ${money(hit.margin, 0)} USDT margin</tspan></text>`);
     headRight = `<text x="${W - 24}" y="66" fill="${C.win}" font-size="17" font-weight="700" text-anchor="end">${hl} · ${signed(p.move, 2)}%</text>`;
   }
 

@@ -15,7 +15,7 @@
 //    "id": "DOTUSDT.P-S-202610281435", "text": "...",
 //    entry only: "side", "entry", "sl", "tp1", "tp2", "lev", "tf", "time"}
 
-import { chartHtml, CHART_WIDTH, CHART_HEIGHT } from "./chart.js";
+import { chartHtml, CHART_WIDTH, CHART_HEIGHT, HIT_CHART_HEIGHT } from "./chart.js";
 
 const TRADE_TTL_SECONDS = 30 * 24 * 3600;
 const EVENTS = new Set(["entry", "tp1", "tp2", "sl"]);
@@ -140,10 +140,10 @@ async function fetchCandles(symbol, tf, upTo) {
 
 // HTML -> PNG with the Cloudflare Browser Run (formerly Browser Rendering)
 // REST API. The product was renamed in 2026; try the new path, then the old one.
-async function screenshot(env, html) {
+async function screenshot(env, html, height = CHART_HEIGHT) {
   const body = JSON.stringify({
     html,
-    viewport: { width: CHART_WIDTH, height: CHART_HEIGHT, deviceScaleFactor: 2 },
+    viewport: { width: CHART_WIDTH, height, deviceScaleFactor: 2 },
     screenshotOptions: { type: "png" },
   });
   let error;
@@ -209,7 +209,7 @@ async function signalChart(env, trade, hit) {
   const html = chartHtml(candles, {
     ...trade, tfLabel: TIMEFRAMES[trade.tf][1], exchange, signalTime: trade.time, hit,
   });
-  return screenshot(env, html);
+  return screenshot(env, html, hit ? HIT_CHART_HEIGHT : CHART_HEIGHT);
 }
 
 async function sendPhoto(env, chatId, png, caption, replyTo) {
