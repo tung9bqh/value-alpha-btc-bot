@@ -80,7 +80,11 @@ EVENT_RULES = [
      "How consumers feel about the economy. A lead indicator for spending.", "$"),
     ("Durable Goods", "(long-lasting goods orders)", HAWKISH_UP, "Durable Goods Orders",
      "Orders for long-lasting goods, a signal of business investment.", "$"),
+    ("Election", "(results come in through the day)", ("Uncertain / contested result:", "Clear, risk-on outcome:"),
+     "US Elections", "Results can shift fiscal and crypto policy expectations; volatility rises as results come in.",
+     "⚖"),
 ]
+RISK_SWING = ("Risk-off surprise:", "Risk-on surprise:")  # events without a forecast to beat or miss
 FALLBACK_RULE = ("", "", HAWKISH_UP, "Other high-impact data",
                  "High-impact US data that can move the dollar and risk assets like BTC.", "$")
 
@@ -118,9 +122,14 @@ def todays_events(feed, now_utc):
         t = datetime.fromisoformat(e["date"]).astimezone(timezone.utc)
         if now_utc <= t < end:
             rule = rule_for(e["title"])
-            out.append({"time": t, "title": display_name(e["title"]), "sub": rule[1],
-                        "forecast": (e.get("forecast") or "").strip() or "—",
-                        "previous": (e.get("previous") or "").strip() or "—", "rule": rule})
+            forecast = (e.get("forecast") or "").strip() or "—"
+            previous = (e.get("previous") or "").strip() or "—"
+            if rule is FALLBACK_RULE and forecast == "—" and previous == "—":
+                rule = rule[:2] + (RISK_SWING,) + rule[3:]
+            # Scheduled releases are on the quarter hour; anything else is a placeholder time
+            # for all-day or tentative events (e.g. elections).
+            out.append({"time": t, "title": display_name(e["title"]), "sub": rule[1], "forecast": forecast,
+                        "previous": previous, "rule": rule, "tentative": t.minute % 15 != 0})
     return sorted(out, key=lambda x: x["time"])[:MAX_ROWS]
 
 
@@ -132,7 +141,8 @@ def build_caption(events, day, tz):
              "🔴 High-impact USD news today:", ""]
     for e in events:
         local = e["time"].astimezone(tz)
-        lines.append(f"• <b>{e['time']:%H:%M} UTC</b> ({local:%H:%M} UTC{offset:+g}) — {html.escape(e['title'])}")
+        when = "Time TBD" if e["tentative"] else f"{e['time']:%H:%M} UTC</b> ({local:%H:%M} UTC{offset:+g})<b>"
+        lines.append(f"• <b>{when}</b> — {html.escape(e['title'])}".replace("<b></b>", ""))
         if e["forecast"] != "—" or e["previous"] != "—":
             lines.append(f"   Forecast: {html.escape(e['forecast'])} | Previous: {html.escape(e['previous'])}")
     lines += ["", "⚠️ Expect high volatility around the releases. Avoid over-leveraging, don't chase the "
@@ -267,7 +277,8 @@ def draw_calendar(events, day, path):
         ym = y0 + row_h / 2
         if r:
             ax.plot([cols[0], cols[-1]], [y0 + row_h, y0 + row_h], color=gold_line, lw=0.6, zorder=4)
-        text((cols[0] + cols[1]) / 2, ym, f"{e['time']:%H:%M}", 15, white, "bold", ha="center")
+        text((cols[0] + cols[1]) / 2, ym, "TBD" if e["tentative"] else f"{e['time']:%H:%M}", 15, white, "bold",
+             ha="center")
         flag((cols[1] + cols[2]) / 2 - 0.0165, ym - 0.0165 * A * 0.55, 0.033)
         name_size = 11.5 if len(e["title"]) <= 30 else 10
         text(cols[2] + 0.008, ym + row_h * 0.17, e["title"], name_size, white, "bold")
