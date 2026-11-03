@@ -11,6 +11,11 @@ on:
         description: "Only preview the post + chart (do not send to Telegram)"
         type: boolean
         default: true
+      session:
+        description: "asia = 08:30 plan, us = 19:00 US-session outlook"
+        type: choice
+        options: [asia, us]
+        default: asia
 
 permissions:
   contents: write  # plan history on the 'state' branch, dry-run preview on 'preview'
@@ -40,7 +45,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
-            python btc_daily_bot.py --dry-run --state-dir state | tee preview.txt
+            python btc_daily_bot.py --dry-run --state-dir state --session "${{ inputs.session || 'asia' }}" | tee preview.txt
           elif [ "${{ github.event_name }}" = "schedule" ]; then
             python btc_daily_bot.py --wait-until 08:30 --state-dir state --once-per-day
           else

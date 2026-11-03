@@ -407,13 +407,108 @@ def build_post(a, data, now):
     return "\n".join(lines)
 
 
+def morning_status(state_dir, data, now):
+    """One sentence on how this morning's plan has played out so far (None if unknown)."""
+    if not state_dir:
+        return None
+    path = os.path.join(state_dir, "plans", f"{now:%Y-%m-%d}.json")
+    if not os.path.exists(path):
+        return None
+    import plan_tracker
+    with open(path) as f:
+        plan = json.load(f)
+    res = plan_tracker.replay(plan, data["M15"], int(now.timestamp()))
+    word = plan["direction"].title()
+    kinds = [e["kind"] for e in res["events"]]
+    if res["status"] == "unknown":
+        return None
+    if not kinds:
+        return f"The morning {word} plan has not been triggered yet."
+    last = kinds[-1]
+    return {
+        "entry": f"The morning {word} is open from {k_fmt(plan['entry'])}.",
+        "tp1": f"The morning {word} has hit TP1 ({k_fmt(plan['tp1'])}); the rest runs with the stop at entry.",
+        "tp2": f"The morning {word} has reached TP2 ({k_fmt(plan['tp2'])}).",
+        "sl": f"The morning {word} was stopped out at {k_fmt(plan['sl'])}.",
+        "be": f"The morning {word} took TP1, then closed the rest at entry.",
+        "cancelled": f"The morning {word} plan was cancelled before entry.",
+        "cancel_exit": f"The morning {word} was closed early as price broke the cancel level.",
+        "skipped": f"The morning {word} played out without a retrace (TP1 hit before entry).",
+    }.get(last)
+
+
+def tonight_news(now):
+    """High-impact USD events between now and 08:30 tomorrow, as a short phrase (None if none/unavailable)."""
+    try:
+        import econ_calendar
+        feed = http_get_json(econ_calendar.FEED_URL, timeout=20)
+        events = econ_calendar.todays_events(feed, now.astimezone(timezone.utc).replace(second=0, microsecond=0))
+    except Exception:  # noqa: BLE001 - the outlook is still useful without the news line
+        return None
+    end = (now + timedelta(days=1)).replace(hour=8, minute=30)
+    items = [f"{e['title']} ({'time TBD' if e['tentative'] else e['time'].astimezone(TZ).strftime('%H:%M')})"
+             for e in events if e["time"] < end]
+    return join_words(items[:4]) if items else None
+
+
+def build_us_post(a, data, now, state_dir=None):
+    """Short evening outlook for the US session: context since the morning + bias + levels."""
+    short = a["direction"] == "SHORT"
+    p, sig, price = a["primary"], a["sig"], a["price"]
+    start = now.replace(hour=8, minute=30, second=0, microsecond=0).timestamp()
+    since = [c for c in data["M15"] if c["t"] >= start] or data["M15"][-40:]
+    chg = (price / since[0]["o"] - 1) * 100
+    lo, hi = min(c["l"] for c in since), max(c["h"] for c in since)
+    h1, m15 = sig["H1"], sig["M15"]
+
+    context = [f"Since this morning BTC has moved {chg:+.1f}% to {k_fmt(price, 100)}, "
+               f"trading in a {k_fmt(lo, 100)}–{k_fmt(hi, 100)} range."]
+    status = morning_status(state_dir, data, now)
+    if status:
+        context.append(status)
+    context.append(f"H1 is {ema_position(h1)} (RSI {h1['rsi']:.0f}) and M15 is {ema_position(m15)} "
+                   f"with {momentum(m15)}.")
+    res, sup = a["res"], a["sup"]
+    if a["at_res"]:
+        context.append(f"Price is testing resistance at {k_fmt(res[1], 100)}.")
+    elif a["at_sup"]:
+        context.append(f"Price is testing support at {k_fmt(sup[1], 100)}.")
+    elif res and sup:
+        context.append(f"Key levels: resistance {k_fmt(res[1], 100)}, support {k_fmt(sup[1], 100)}.")
+
+    zone = f"{k_fmt(p['lo'])}–{k_fmt(p['hi'])}"
+    if a["setup"] == "resistance":
+        plan = f"For the US session, favour a SHORT from resistance at {zone} once price shows rejection."
+    elif a["setup"] == "support":
+        plan = f"For the US session, favour a LONG from support at {zone} once price shows a bounce."
+    else:
+        plan = (f"For the US session, favour {'SHORT' if short else 'LONG'}: "
+                f"{'sell a rebound into' if short else 'buy a pullback into'} {zone} rather than chasing the move.")
+    plan += (f" Cancel the idea if an H1 candle closes {'above' if short else 'below'} {k_fmt(p['cancel'])}.")
+    news = tonight_news(now)
+
+    lines = [
+        f"🌙 <b>BTC — US SESSION OUTLOOK | {now:%b %d}</b>".upper().replace("<B>", "<b>").replace("</B>", "</b>"),
+        f"{'🔴' if short else '🟢'} <b>BIAS: {a['direction']}</b>",
+        "",
+        html.escape(" ".join(context)),
+        "",
+        html.escape(plan),
+        *setup_lines(p),
+    ]
+    if news:
+        lines += ["", f"⚠️ <b>Tonight:</b> {html.escape(news)} — expect volatility, avoid entries right before releases."]
+    lines += ["", "<i>Not financial advice. Manage your risk.</i>"]
+    return "\n".join(lines)
+
+
 def visible_len(text):
     return len(html.unescape(re.sub(r"<[^>]+>", "", text)))
 
 
 # --------------------------------------------------------------- image
 
-def draw_plan_image(data, a, now, path):
+def draw_plan_image(data, a, now, path, session=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -454,6 +549,9 @@ def draw_plan_image(data, a, now, path):
     ov.text(0.159, 0.817, f"{now:%d/%m/%Y}", color=fg, fontsize=17, fontweight="bold", ha="center", va="center")
     box(0.237, 0.79, 0.055, 0.055, gold, face=bg, lw=1.6, r=0.008)
     ov.text(0.2645, 0.817, "M15", color=gold, fontsize=17, fontweight="bold", ha="center", va="center")
+    if session:
+        box(0.305, 0.79, 0.135, 0.055, accent, face=bg, lw=1.6, r=0.008)
+        ov.text(0.3725, 0.817, session, color=accent, fontsize=15, fontweight="bold", ha="center", va="center")
 
     # ---- M15 chart
     candles = data["M15"][-260:]
@@ -655,6 +753,8 @@ def main():
     p.add_argument("--chart-out", default="btc_plan.png", help="where to save the plan image")
     p.add_argument("--state-dir", help="plan history folder: enables the recap of the previous plan "
                                        "and saves today's plan for the alert tracker")
+    p.add_argument("--session", choices=["asia", "us"], default="asia",
+                   help="asia = full 08:30 plan; us = short 19:00 outlook for the US session")
     p.add_argument("--once-per-day", action="store_true",
                    help="skip if today's plan is already in --state-dir (guards against late/duplicate triggers)")
     args = p.parse_args()
@@ -672,9 +772,18 @@ def main():
     data, source = fetch_market()
     analysis = analyze(data)
     now = datetime.now(TZ)
-    text = build_post(analysis, data, now)
-    draw_plan_image(data, analysis, now, args.chart_out)
+    if args.session == "us":
+        text = build_us_post(analysis, data, now, args.state_dir)
+        draw_plan_image(data, analysis, now, args.chart_out, session="US SESSION")
+    else:
+        text = build_post(analysis, data, now)
+        draw_plan_image(data, analysis, now, args.chart_out)
 
+    if args.dry_run and args.session == "us":
+        print(text)
+        words = len(re.sub(r"<[^>]+>", "", text).split())
+        print(f"\n[source {source}; {words} words; {visible_len(text)} chars; image saved to {args.chart_out}]")
+        return 0
     if args.dry_run:
         if args.state_dir:
             import plan_tracker
@@ -683,6 +792,9 @@ def main():
         print(f"\n[source {source}; {visible_len(text)} chars; image saved to {args.chart_out}]")
         return 0
 
+    if args.session == "us":
+        print("US-session posting is preview-only for now (use --dry-run).", file=sys.stderr)
+        return 2
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not token or not chat_id:
