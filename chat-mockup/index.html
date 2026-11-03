@@ -269,7 +269,8 @@ button:disabled{opacity:.45;cursor:default}
 .lbulk select{height:34px;padding:0 8px;min-width:0}
 .lbulk .chk{padding:0;font-size:12.5px}
 .lbadge{flex:none;font-size:15px;line-height:1}
-.lver{flex:none;display:block}
+.l1 .lver{flex:none;display:block}
+.name .bdg-svg{margin-left:2px}
 .lmute{flex:none;color:var(--l-sub)}
 .lright{margin-left:auto;display:flex;align-items:center;gap:4px;flex:none;color:var(--l-sub);font-size:14px;padding-left:6px}
 .ltk{color:var(--l-acc);display:flex}
@@ -408,7 +409,12 @@ button:disabled{opacity:.45;cursor:default}
     </div>
 
     <div class="pane" id="pane-ui">
-      <div class="sect" style="margin-top:0">Bộ màu có sẵn</div>
+      <div class="sect" style="margin-top:0">Avatar ngẫu nhiên (nút 🎲)</div>
+      <select id="avStyle" aria-label="Kiểu avatar ngẫu nhiên">
+        <option value="photo">📷 Ảnh chụp thật – phong cảnh, xe, động vật, đồ vật… (cần Internet)</option>
+        <option value="illus">🎨 Minh hoạ – emoji, hoạ tiết (không cần mạng)</option>
+      </select>
+      <div class="sect">Bộ màu có sẵn</div>
       <div class="presets" id="presets"></div>
       <div id="chatForm"></div>
       <div class="sect">Dữ liệu</div>
@@ -453,7 +459,7 @@ button:disabled{opacity:.45;cursor:default}
   </table>
   <h3>Avatar &amp; huy hiệu</h3>
   <table>
-    <tr><td class="ic">🎲</td><td><b>Ngẫu nhiên</b>Ở tab “Người chat”, “Danh sách chat” và avatar nhóm: bấm để tạo ngay một avatar minh hoạ ngẫu nhiên; bấm tiếp để đổi cái khác.</td></tr>
+    <tr><td class="ic">🎲</td><td><b>Ngẫu nhiên</b>Ở tab “Người chat”, “Danh sách chat”, thanh sửa nhanh và avatar nhóm: bấm để lấy một avatar ngẫu nhiên; bấm tiếp để đổi cái khác. Mặc định là ảnh chụp thật (phong cảnh, xe, động vật, đồ vật… từ kho ảnh miễn phí, cần Internet); đổi sang kiểu minh hoạ ở đầu tab “Giao diện &amp; dữ liệu”. Không có mạng thì tự dùng kiểu minh hoạ.</td></tr>
     <tr><td class="ic">✔</td><td><b>Huy hiệu sau tên</b>Bấm một trong 10 huy hiệu (tích xanh, sao Premium, 💎 🔥 👑 🚀 💰 ⚡ 🌟 🐳) để dùng ngay, ✕ để bỏ, hoặc gõ emoji/chữ tuỳ ý vào ô bên dưới.</td></tr>
   </table>
   <h3>Mẹo</h3>
@@ -592,7 +598,7 @@ function persist(j){
   if(!ready) return;
   const id=W.current, meta=curChat(); if(meta) meta.updated=Date.now();
   wq=wq.then(()=>DB.set('chat:'+id,j)).then(()=>DB.set('index',W))
-    .then(()=>note('Đã tự lưu · '+new Date().toLocaleTimeString()))
+    .then(()=>{note((avWarn?'⚠ Không tải được ảnh chụp (cần Internet) – đã dùng avatar minh hoạ · ':'')+'Đã tự lưu · '+new Date().toLocaleTimeString());avWarn=false})
     .catch(e=>note('⚠ Không lưu được ('+(e&&(e.name||e.message)||e)+'). Hãy “Xuất sao lưu” để giữ dữ liệu.'));
 }
 window.addEventListener('pagehide',()=>commit());
@@ -689,7 +695,7 @@ function badgePicker(cur,attr){
 /* ---------- Avatar ngẫu nhiên (vẽ ngay trong trình duyệt, không dùng ảnh người thật) ---------- */
 const AV_EMOJI='🦊 🐼 🐨 🐯 🦁 🐸 🐵 🐧 🐙 🦄 🐳 🦉 🐻 🐰 🐶 🐱 🦋 🌵 🍀 🌸 🍉 🍩 ⚽ 🎧 🎮 🚀 🌙 ⭐ 🔥 💎 🐲 🦖'.split(' ');
 const pick=a=>a[Math.floor(Math.random()*a.length)];
-function randomAvatar(){
+function illusAvatar(){
   const N=256, c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d');
   const h=Math.random()*360, h2=(h+40+Math.random()*90)%360;
   const gr=g.createLinearGradient(0,0,N,N);gr.addColorStop(0,`hsl(${h},72%,64%)`);gr.addColorStop(1,`hsl(${h2},66%,44%)`);
@@ -749,9 +755,33 @@ function bulkRandomNames(){
   L.forEach(it=>{
     let n,t=0;do{n=genName(region)}while(used.has(n)&&++t<30);used.add(n);
     it.name=n;it.color=pick(AV_COLORS);
-    if(withAv) it.avatar=randomAvatar();
   });
-  setView('list');renderPhone();renderLlist();renderLform();renderLQbar();save();
+  setView('list');renderPhone();renderLlist();renderLform();renderLQbar();
+  if(!withAv){save();return}
+  Promise.all(L.map(async it=>{it.avatar=await randomAvatar()})).then(()=>{renderPhone();renderLform();renderLQbar();save()});
+}
+/* Avatar ngẫu nhiên kiểu ảnh chụp: lấy ngẫu nhiên từ Lorem Picsum (ảnh Unsplash miễn phí: phong cảnh, xe, động vật, đồ vật…).
+   Không lấy ảnh đại diện của người thật trên mạng xã hội. Không có mạng → dùng avatar minh hoạ. */
+let avStyle='photo';
+try{avStyle=localStorage.getItem('cms:avstyle')||'photo'}catch(e){}
+function photoAvatar(){
+  return new Promise(async(res,rej)=>{
+    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),8000);
+    try{
+      const r=await fetch(`https://picsum.photos/seed/${uid()}/320/320`,{signal:ctl.signal,mode:'cors'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const bl=await r.blob();if(!/^image\//.test(bl.type)) throw new Error('not image');
+      readImg(new File([bl],'avatar.jpg',{type:bl.type}),256,res);
+    }catch(e){rej(e)}finally{clearTimeout(t)}
+  });
+}
+let avBusy=0, avWarn=false;
+async function randomAvatar(){
+  if(avStyle!=='photo') return illusAvatar();
+  avBusy++;note('⏳ Đang tải ảnh avatar ngẫu nhiên…');document.body.style.cursor='progress';
+  try{const u=await photoAvatar();note('Đã tải ảnh avatar.');return u}
+  catch(e){avWarn=true;note('⚠ Không tải được ảnh chụp (cần Internet) – đã dùng avatar minh hoạ thay thế.');return illusAvatar()}
+  finally{if(--avBusy<=0){avBusy=0;document.body.style.cursor=''}}
 }
 const LICON={
   verified:'<svg class="lver" width="19" height="19" viewBox="0 0 24 24"><path fill="var(--l-acc)" d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -1016,7 +1046,7 @@ $('#qbar').addEventListener('click',e=>{
   if(a==='lbadge'){qBadgeOpen=!qBadgeOpen;renderLQbar();return}
   if(a==='ldup'||a==='ldel'){doLAct(a==='ldup'?'dup':'del');return}
   if(a==='lmore'){showTab('lst');$('#lform').scrollIntoView({behavior:'smooth',block:'start'});return}
-  if(a==='lav') it.avatar=randomAvatar();
+  if(a==='lav'){randomAvatar().then(u=>{it.avatar=u;renderPhone();renderLform();renderLQbar();save()});return}
   if(a==='ltick') it.status={none:'sent',sent:'read',read:'none'}[it.status];
   if(a==='lhl') it.hl={none:'selected',selected:'hover',hover:'none'}[it.hl];
   if(a==='lpin') it.pinned=!it.pinned;
@@ -1192,7 +1222,7 @@ pBox.addEventListener('click',e=>{
   const b=e.target.closest('button[data-pact]');if(!b) return;
   const p=S.people.find(x=>x.id===b.closest('[data-pid]').dataset.pid);
   if(b.dataset.pact==='rmav') p.avatar='';
-  if(b.dataset.pact==='randav') p.avatar=randomAvatar();
+  if(b.dataset.pact==='randav'){randomAvatar().then(u=>{p.avatar=u;renderPeople();renderPhone();renderCompose();save()});return}
   if(b.dataset.pact==='rm'){
     const n=S.messages.filter(m=>m.from===p.id&&m.type!=='date').length;
     if(!confirm(`Xoá “${p.name}”${n?` và ${n} tin nhắn của người này`:''}?`)) return;
@@ -1274,7 +1304,7 @@ $('#chatForm').addEventListener('change',e=>{
   readImg(e.target.files[0],k==='bgImg'?1400:256,url=>{S.chat[k]=url;renderChatForm();renderPhone();save()});
 });
 $('#chatForm').addEventListener('click',e=>{
-  const r=e.target.closest('[data-crand]');if(r){S.chat[r.dataset.crand]=randomAvatar();renderChatForm();renderPhone();save();return}
+  const r=e.target.closest('[data-crand]');if(r){const k=r.dataset.crand;randomAvatar().then(u=>{S.chat[k]=u;renderChatForm();renderPhone();save()});return}
   const k=e.target.dataset?.cclear;if(!k) return;S.chat[k]='';renderChatForm();renderPhone();save();
 });
 
@@ -1477,7 +1507,7 @@ function doLAct(a){
   if(a==='dup'){const c={...L[i],id:uid(),hl:'none'};L.splice(i+1,0,c);lsel=c.id}
   if(a==='del'){L.splice(i,1);lsel=(L[i]||L[i-1]||{}).id||null}
   if(a==='rmavatar') L[i].avatar='';
-  if(a==='randav') L[i].avatar=randomAvatar();
+  if(a==='randav'){const it=L[i];randomAvatar().then(u=>{it.avatar=u;renderPhone();renderLform();renderLQbar();save()});return}
   if(a==='randname') L[i].name=genName($('#bulkRegion').value);
   if(a==='rmthumb') L[i].thumb='';
   renderPhone();renderLlist();renderLform();renderLQbar();save();
@@ -1490,7 +1520,9 @@ function addListItem(){
   renderPhone();save();selectL(it.id,true);
 }
 $('#addL').onclick=addListItem;
-$('#bulkNames').onclick=bulkRandomNames;$('#bulkNames2').onclick=bulkRandomNames;$('#addL2').onclick=addListItem;
+$('#bulkNames').onclick=bulkRandomNames;
+$('#avStyle').value=avStyle;
+$('#avStyle').onchange=e=>{avStyle=e.target.value;try{localStorage.setItem('cms:avstyle',avStyle)}catch(_){}};$('#bulkNames2').onclick=bulkRandomNames;$('#addL2').onclick=addListItem;
 const LSF=[['showHeader','Hiện thanh tiêu đề (Edit · Chats · ✎)','check'],['title','Tiêu đề','text'],['leftText','Chữ bên trái','text'],
   ['bg','Màu nền','color'],['selBg','Nền dòng đang chọn','color'],['hoverBg','Nền dòng nhạt','color'],
   ['accent','Màu nhấn (tick, Photo, tích xanh)','color'],['nameColor','Màu tên','color'],['subColor','Màu chữ phụ (nội dung, giờ)','color']];
