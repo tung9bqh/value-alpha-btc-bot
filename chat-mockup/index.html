@@ -12,7 +12,7 @@
   --ui-acc:#8b6cf0; --ui-input:#101117;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--ui-bg);color:var(--ui-text);
+html,body{margin:0;background:var(--ui-bg);color:var(--ui-text);touch-action:manipulation;
   font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 button,.btn,label.file{font:inherit;color:var(--ui-text);background:#252733;border:1px solid var(--ui-line);
   border-radius:8px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
@@ -73,23 +73,40 @@ button:disabled{opacity:.45;cursor:default}
 #modal[hidden]{display:none}
 .mbox{background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:14px;max-height:100%;overflow:auto;display:grid;gap:10px;justify-items:center}
 .mbox img{max-width:min(390px,100%);max-height:70vh;border-radius:8px}
+.chatbar{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.chatbar select{flex:1 1 160px;width:auto}
+.presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.preset{flex-direction:column;align-items:stretch;padding:5px;font-size:12px;gap:4px}
+.preset.on{outline:2px solid var(--ui-acc)}
+.pv{display:flex;flex-direction:column;justify-content:center;gap:4px;height:46px;border-radius:6px;padding:6px}
+.pv i{display:block;height:12px;border-radius:6px;width:62%}
+.pv i:first-child{align-self:flex-end}
+.devwrap{position:relative;max-width:100%}
+#qbar{position:absolute;z-index:20;display:flex;align-items:center;gap:1px;padding:4px;background:rgba(23,24,30,.97);
+  border:1px solid var(--ui-line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#qbar[hidden]{display:none}
+#qbar button{padding:6px 8px;border:none;background:none;font-size:15px;line-height:1}
+#qbar button:hover{background:#2e3140}
+#qbar .qtime{width:64px;padding:4px 6px;font-size:13px;margin:0 3px 0 1px}
 
 /* ================= CHAT SCREEN ================= */
-#screen{position:relative;width:min(var(--W),calc(100vw - 32px));height:var(--H);overflow:hidden;color:#fff;
+#screen{--pill-bg:rgba(32,32,36,.94);--pill-txt:#fff;--pill-line:rgba(255,255,255,.07);--hdr-fade:rgba(0,0,0,.6);
+  position:relative;width:min(var(--W),calc(100vw - 32px));height:var(--H);overflow:hidden;color:#fff;
   background-color:var(--chatbg);background-image:var(--pat);background-size:var(--patsize);background-position:center;
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;text-align:left}
+#screen.light{--pill-bg:rgba(255,255,255,.96);--pill-txt:#000;--pill-line:rgba(0,0,0,.06);--hdr-fade:rgba(255,255,255,.55)}
 #scroller{position:absolute;inset:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none}
 #scroller::-webkit-scrollbar{display:none}
 #msgs{margin-top:auto;padding:94px 0 12px;display:flex;flex-direction:column}
 .hdr{position:absolute;left:0;right:0;top:0;z-index:5;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;
-  padding:16px 10px 26px;background:linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,0))}
-.pill{background:rgba(32,32,36,.94);border:1px solid rgba(255,255,255,.07);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  padding:16px 10px 26px;background:linear-gradient(var(--hdr-fade),transparent)}
+.pill{background:var(--pill-bg);color:var(--pill-txt);border:1px solid var(--pill-line);box-shadow:0 2px 10px rgba(0,0,0,.25)}
 .back{height:48px;border-radius:24px;display:flex;align-items:center;gap:7px;padding:0 10px 0 16px}
-.back .cnt{font-size:17px;font-weight:600;background:rgba(255,255,255,.13);border-radius:13px;padding:1px 8px;line-height:24px}
+.back .cnt{font-size:17px;font-weight:600;background:color-mix(in srgb,var(--pill-txt) 12%,transparent);border-radius:13px;padding:1px 8px;line-height:24px}
 .ttl{justify-self:center;max-width:100%;min-width:0;border-radius:26px;padding:6px 16px 7px;text-align:center}
 .ttl .t{font-size:17px;font-weight:600;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ttl .s{font-size:13px;line-height:17px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl .s{font-size:13px;line-height:17px;color:color-mix(in srgb,var(--pill-txt) 55%,transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hav{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:500;overflow:hidden;
   border:1px solid rgba(255,255,255,.08)}
 .hav img{width:100%;height:100%;object-fit:cover}
@@ -101,8 +118,8 @@ button:disabled{opacity:.45;cursor:default}
 .row.in.noav{padding-left:16px}
 .ava-slot{width:36px;flex:none;margin-right:10px;display:flex}
 .bubble{position:relative;max-width:78%;padding:6px 12px 7px;border-radius:18px;font-size:var(--fs);line-height:calc(var(--fs) * 1.3);overflow-wrap:anywhere}
-.in .bubble{background:var(--in)}
-.out .bubble{max-width:84%}
+.in .bubble{background:var(--in);color:var(--txt-in)}
+.out .bubble{max-width:84%;color:var(--txt-out)}
 .out .bubble{background-image:linear-gradient(var(--out1),var(--out2));background-size:100% var(--H);
   background-position:0 calc(var(--gy,0px) * -1);background-color:var(--out1)}
 .out:not(.first) .bubble{border-top-right-radius:7px}
@@ -119,21 +136,21 @@ button:disabled{opacity:.45;cursor:default}
 .in .tail{left:-8px;transform:scaleX(-1);background:var(--in)}
 .name{font-size:15px;font-weight:600;line-height:20px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .txt{white-space:pre-wrap}
-.txt[contenteditable]{outline:1px dashed rgba(255,255,255,.6);outline-offset:2px;border-radius:3px}
+.txt[contenteditable],.svc span[contenteditable],.emo[contenteditable]{outline:1px dashed currentColor;outline-offset:2px;border-radius:3px}
 .meta{position:absolute;right:10px;bottom:5px;font-size:12px;line-height:14px;display:inline-flex;align-items:center;gap:3px;
-  color:rgba(255,255,255,.5);white-space:nowrap;pointer-events:none}
-.out .meta{color:rgba(255,255,255,.72)}
+  color:color-mix(in srgb,var(--txt-in) 50%,transparent);white-space:nowrap;pointer-events:none}
+.out .meta{color:color-mix(in srgb,var(--txt-out) 72%,transparent)}
 .spacer{visibility:hidden;display:inline-flex;align-items:center;gap:3px;font-size:12px;line-height:14px;margin-left:12px;white-space:nowrap}
 .tk{display:block}
 .reply{display:block;margin:3px -4px 4px;padding:3px 9px 4px 10px;border-radius:7px;border-left:3px solid var(--rc);
   background:color-mix(in srgb,var(--rc) 16%,transparent);font-size:15px;line-height:19px;min-width:0}
 .reply b{display:block;font-weight:600;color:var(--rc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.reply span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.reply span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit}
 .reacts{display:flex;flex-wrap:wrap;gap:6px;margin:5px 0 1px -4px;align-items:center}
-.chip{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 4px 0 9px;border-radius:15px;font-size:17px;background:#3d8af7}
+.chip{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 4px 0 9px;border-radius:15px;font-size:17px;background:#3d8af7;color:#fff}
 .chip:not(:has(.av)){padding-right:9px}
 .chip b{font-size:14px;font-weight:600}
-.out .chip{background:rgba(255,255,255,.22)}
+.out .chip{background:color-mix(in srgb,var(--txt-out) 20%,transparent);color:inherit}
 .bubble.media{padding:3px}
 .bubble.media img{display:block;width:100%;border-radius:15px}
 .bubble.media .cap{padding:4px 9px 3px}
@@ -164,10 +181,13 @@ button:disabled{opacity:.45;cursor:default}
       </select>
       <button class="primary" id="btnPng">⬇ Xuất ảnh PNG</button>
     </div>
-    <div class="device"><div id="screen">
-      <div id="scroller"><div id="msgs"></div></div>
-      <div class="hdr" id="hdr"></div>
-    </div></div>
+    <div class="devwrap">
+      <div class="device"><div id="screen">
+        <div id="scroller"><div id="msgs"></div></div>
+        <div class="hdr" id="hdr"></div>
+      </div></div>
+      <div id="qbar" hidden></div>
+    </div>
     <div class="composer">
       <div class="senders" id="senders"></div>
       <textarea id="cText" rows="2" placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
@@ -183,7 +203,14 @@ button:disabled{opacity:.45;cursor:default}
 
   <aside class="editor">
     <h1>Chat Mockup Studio</h1>
-    <div class="save-note" id="saveNote">Dữ liệu tự lưu trong trình duyệt này.</div>
+    <div class="save-note" id="saveNote">Đang tải dữ liệu…</div>
+    <div class="chatbar">
+      <select id="chatSel" title="Chọn cuộc chat" aria-label="Chọn cuộc chat"></select>
+      <button id="chatNew" title="Tạo cuộc chat trống">＋ Mới</button>
+      <button id="chatDup" title="Nhân bản cuộc chat này">⧉ Nhân bản</button>
+      <button id="chatRen" title="Đổi tên cuộc chat">✎ Tên</button>
+      <button id="chatDel" class="danger" title="Xoá cuộc chat này">🗑</button>
+    </div>
     <div class="tabs">
       <button data-tab="msg" class="on">Tin nhắn</button>
       <button data-tab="ppl">Người chat</button>
@@ -206,11 +233,14 @@ button:disabled{opacity:.45;cursor:default}
     </div>
 
     <div class="pane" id="pane-ui">
+      <div class="sect" style="margin-top:0">Bộ màu có sẵn</div>
+      <div class="presets" id="presets"></div>
       <div id="chatForm"></div>
       <div class="sect">Dữ liệu</div>
       <div class="row-btns">
-        <button id="expJson">Xuất JSON</button>
-        <label class="file">Nhập JSON<input type="file" id="impJson" accept="application/json,.json"></label>
+        <button id="expJson">Xuất JSON (chat này)</button>
+        <button id="expAll">Xuất sao lưu (tất cả chat)</button>
+        <label class="file">Nhập JSON / sao lưu<input type="file" id="impJson" accept="application/json,.json"></label>
         <button id="clearMsgs" class="danger">Xoá hết tin nhắn</button>
         <button id="resetAll" class="danger">Khôi phục mẫu</button>
       </div>
@@ -235,7 +265,8 @@ function sample(){
   return {
     chat:{title:'Special 1:1 with Emilio Nuñez',subtitle:'3 members',back:'65',avatarText:'S',avatarColor:'#4caf50',avatarImg:'',
       showNames:true,showAvatars:true,out1:'#9a5cf2',out2:'#5d6ef6',inColor:'#26262b',bgColor:'#08080b',
-      pattern:true,patternColor:'#5b4596',bgImg:'',width:390,height:844,fontSize:17},
+      pattern:true,patternColor:'#5b4596',bgImg:'',width:390,height:844,fontSize:17,
+      theme:'dark',outText:'#ffffff',inText:'#ffffff'},
     people:[
       {id:'me',name:'Money0x Mr',color:'#ffffff',badge:'',avatar:''},
       {id:'p1',name:'Leite Mauricio',color:'#6ec6e8',badge:'★',avatar:''}
@@ -261,7 +292,8 @@ const okId=v=>typeof v==='string'&&/^[\w-]{1,40}$/.test(v);
 function sanitize(d){
   if(!d||typeof d!=='object'||!Array.isArray(d.messages)||!Array.isArray(d.people)) return null;
   const def=sample().chat, c=Object.assign({},def,d.chat||{});
-  ['avatarColor','out1','out2','inColor','bgColor','patternColor'].forEach(k=>{if(!okColor(c[k])) c[k]=def[k]});
+  ['avatarColor','out1','out2','inColor','bgColor','patternColor','outText','inText'].forEach(k=>{if(!okColor(c[k])) c[k]=def[k]});
+  if(c.theme!=='light') c.theme='dark';
   ['avatarImg','bgImg'].forEach(k=>{if(!okImg(c[k])) c[k]=''});
   ['width','height','fontSize'].forEach(k=>{c[k]=Math.min(4000,Math.max(10,+c[k]||def[k]))});
   ['title','subtitle','back','avatarText'].forEach(k=>{c[k]=String(c[k]??'')});
@@ -278,17 +310,50 @@ function sanitize(d){
   return {chat:c,people,messages};
 }
 
-let S=null;
-try{S=sanitize(JSON.parse(localStorage.getItem(KEY)))}catch(e){}
-if(!S) S=sample();
-let sel=null, composeFrom='me';
+/* ---------- Lưu trữ: IndexedDB (chứa được hàng trăm MB), dự phòng localStorage ---------- */
+const DB=(()=>{
+  let pr=null, failed=false;
+  const open=()=>pr||(pr=new Promise((res,rej)=>{
+    try{
+      const r=indexedDB.open('chat-mockup-studio',1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>{failed=true;rej(r.error)};
+    }catch(e){failed=true;rej(e)}
+  }));
+  const tx=(mode,fn)=>open().then(db=>new Promise((res,rej)=>{
+    const t=db.transaction('kv',mode), q=fn(t.objectStore('kv'));
+    t.oncomplete=()=>res(q&&q.result);t.onerror=t.onabort=()=>rej(t.error||new Error('Lỗi lưu trữ'));
+  }));
+  const LS='cms:';
+  return {
+    async get(k){if(!failed){try{return await tx('readonly',s=>s.get(k))}catch(e){if(!failed) throw e}}
+      const v=localStorage.getItem(LS+k);return v==null?undefined:JSON.parse(v)},
+    async set(k,v){if(!failed){try{await tx('readwrite',s=>{s.put(v,k)});return}catch(e){if(!failed) throw e}}
+      localStorage.setItem(LS+k,JSON.stringify(v))},
+    async del(k){if(!failed){try{await tx('readwrite',s=>{s.delete(k)});return}catch(e){if(!failed) throw e}}
+      localStorage.removeItem(LS+k)},
+    kind:()=>open().then(()=>'IndexedDB',()=>'localStorage')
+  };
+})();
+
+/* W = danh sách cuộc chat; S = dữ liệu cuộc chat đang mở */
+let W={chats:[],current:null};
+let S=sample(), sel=null, composeFrom='me', ready=false, wq=Promise.resolve();
+const note=t=>{$('#saveNote').textContent=t};
+const curChat=()=>W.chats.find(c=>c.id===W.current);
 
 /* Lưu tự động + lịch sử Hoàn tác / Làm lại */
 let saveT, hist=[], fut=[], lastJ=JSON.stringify(S);
 function persist(j){
-  try{localStorage.setItem(KEY,j);$('#saveNote').textContent='Đã tự lưu trong trình duyệt này · '+new Date().toLocaleTimeString()}
-  catch(e){$('#saveNote').textContent='⚠ Không tự lưu được (có thể do ảnh quá lớn). Hãy dùng “Xuất JSON” để giữ dữ liệu.'}
+  if(!ready) return;
+  const id=W.current, meta=curChat(); if(meta) meta.updated=Date.now();
+  wq=wq.then(()=>DB.set('chat:'+id,j)).then(()=>DB.set('index',W))
+    .then(()=>note('Đã tự lưu · '+new Date().toLocaleTimeString()))
+    .catch(e=>note('⚠ Không lưu được ('+(e&&(e.name||e.message)||e)+'). Hãy “Xuất sao lưu” để giữ dữ liệu.'));
 }
+window.addEventListener('pagehide',()=>commit());
+document.addEventListener('visibilitychange',()=>{if(document.hidden) commit()});
 function commit(){
   clearTimeout(saveT);
   const j=JSON.stringify(S); if(j===lastJ) return;
@@ -321,7 +386,7 @@ function metaHTML(m,out){
 function replyHTML(m,out){
   if(!m.replyName&&!m.replyText) return '';
   const rp=S.people.find(p=>p.name===m.replyName);
-  let c=out?'#ffffff':(rp?rp.color:'#6ec6e8');
+  let c=out?S.chat.outText:(rp?rp.color:'#6ec6e8');
   if(!out&&c.toLowerCase()==='#ffffff') c='#b49cff';
   return `<div class="reply" style="--rc:${c}"><b>${esc(m.replyName)}</b><span>${esc(m.replyText)}</span></div>`;
 }
@@ -355,7 +420,7 @@ function patternURL(c){
 function renderHeader(){
   const c=S.chat;
   $('#hdr').innerHTML=`
-    <div class="pill back"><svg width="12" height="20" viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>${c.back!==''?`<span class="cnt">${esc(c.back)}</span>`:''}</div>
+    <div class="pill back"><svg width="12" height="20" viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>${c.back!==''?`<span class="cnt">${esc(c.back)}</span>`:''}</div>
     <div class="pill ttl"><div class="t">${esc(c.title)}</div>${c.subtitle?`<div class="s">${esc(c.subtitle)}</div>`:''}</div>
     <div class="hav" style="background:linear-gradient(color-mix(in srgb,${c.avatarColor} 70%,white),${c.avatarColor})">${c.avatarImg?`<img src="${c.avatarImg}" alt="">`:esc(c.avatarText)}</div>`;
 }
@@ -366,6 +431,8 @@ function applyScreenVars(){
   scr.style.setProperty('--fs',(+c.fontSize||17)+'px');
   scr.style.setProperty('--out1',c.out1);scr.style.setProperty('--out2',c.out2);
   scr.style.setProperty('--in',c.inColor);scr.style.setProperty('--chatbg',c.bgColor);
+  scr.style.setProperty('--txt-out',c.outText);scr.style.setProperty('--txt-in',c.inText);
+  scr.classList.toggle('light',c.theme==='light');
   if(c.bgImg){scr.style.setProperty('--pat',`url("${c.bgImg}")`);scr.style.setProperty('--patsize','cover')}
   else if(c.pattern){scr.style.setProperty('--pat',patternURL(c.patternColor));scr.style.setProperty('--patsize','260px')}
   else{scr.style.setProperty('--pat','none')}
@@ -401,7 +468,7 @@ function renderPhone(keep='auto'){
   const atBottom=sc.scrollHeight-sc.scrollTop-sc.clientHeight<6, st=sc.scrollTop;
   applyScreenVars();renderHeader();renderMsgs();
   if(keep==='bottom'||(keep==='auto'&&atBottom)) sc.scrollTop=sc.scrollHeight; else sc.scrollTop=st;
-  updateGrad();
+  updateGrad();placeQbar();
 }
 function updateGrad(){
   const scr=$('#screen'), top=scr.getBoundingClientRect().top;
@@ -410,8 +477,66 @@ function updateGrad(){
     b.style.setProperty('--gy',(r.top-top)+'px');b.style.setProperty('--bh',r.height+'px');
   });
 }
-$('#scroller').addEventListener('scroll',updateGrad,{passive:true});
-window.addEventListener('resize',updateGrad);
+$('#scroller').addEventListener('scroll',()=>{updateGrad();placeQbar()},{passive:true});
+window.addEventListener('resize',()=>{updateGrad();placeQbar()});
+
+/* ---------- Thanh sửa nhanh nổi cạnh tin đang chọn ---------- */
+function renderQbar(){
+  const q=$('#qbar'), m=getMsg(sel);
+  if(!m){q.hidden=true;q.innerHTML='';return}
+  const isDate=m.type==='date';
+  q.innerHTML=`${isDate?'':`<input class="qtime" value="${esc(m.time)}" title="Giờ gửi" aria-label="Giờ gửi">`}
+    <button data-q="edit" title="Sửa chữ ngay trên khung chat">✎</button>
+    ${isDate?'':'<button data-q="who" title="Đổi người gửi">👤</button><button data-q="reply" title="Soạn tin trả lời tin này">↩</button>'}
+    <button data-q="dup" title="Nhân bản">⧉</button><button data-q="del" title="Xoá">🗑</button>
+    <button data-q="more" title="Mở form sửa chi tiết">⋯</button><button data-q="close" title="Bỏ chọn (Esc)">✕</button>`;
+  placeQbar();
+}
+function placeQbar(){
+  const q=$('#qbar'), m=getMsg(sel), row=m&&$(`#msgs [data-id="${sel}"]`);
+  if(!row||!q.innerHTML){q.hidden=true;return}
+  const tgt=row.querySelector('.bubble,.sticker,span')||row;
+  const wrap=$('.devwrap').getBoundingClientRect(), scr=$('#screen').getBoundingClientRect(), r=tgt.getBoundingClientRect();
+  if(r.bottom<scr.top+70||r.top>scr.bottom-10){q.hidden=true;return}
+  q.hidden=false;
+  const ti=q.querySelector('.qtime'); if(ti&&document.activeElement!==ti) ti.value=m.time;
+  const qh=q.offsetHeight, qw=q.offsetWidth;
+  let top=r.bottom-wrap.top+6;
+  if(r.bottom+6+qh>Math.min(scr.bottom,window.innerHeight)-4) top=r.top-wrap.top-qh-6;  // không đủ chỗ phía dưới → lật lên trên
+  top=Math.max(scr.top-wrap.top+4,Math.min(top,scr.bottom-wrap.top-qh-4));
+  let left=m.from==='me'?r.right-wrap.left-qw:r.left-wrap.left;
+  left=Math.max(4,Math.min(left,wrap.width-qw-4));
+  q.style.top=top+'px';q.style.left=left+'px';
+}
+$('#qbar').addEventListener('input',e=>{
+  if(!e.target.classList.contains('qtime')) return;
+  const m=getMsg(sel);if(!m) return;
+  m.time=e.target.value;renderPhone();renderList();
+  const f=$('#form [data-m="time"]');if(f) f.value=m.time;
+  save();
+});
+$('#qbar').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-q]');if(!b) return;
+  const m=getMsg(sel);if(!m) return;
+  const a=b.dataset.q;
+  if(a==='edit'){
+    const t=$(`#msgs [data-id="${sel}"]`)?.querySelector('.txt,.emo,.svc span')||($(`#msgs .svc[data-id="${sel}"] span`));
+    if(t&&!(m.type==='sticker'&&m.img)) startInline(t,m); else openForm();
+  }
+  if(a==='who'){
+    const i=S.people.findIndex(p=>p.id===m.from);m.from=S.people[(i+1)%S.people.length].id;
+    renderPhone();renderList();renderForm();save();
+  }
+  if(a==='reply'){$('#cReply').checked=true;$('#cText').focus();$('.composer').scrollIntoView({behavior:'smooth',block:'nearest'})}
+  if(a==='dup'||a==='del') doAct(a);
+  if(a==='more') openForm();
+  if(a==='close') deselect();
+});
+function openForm(){showTab('msg');$('#form').scrollIntoView({behavior:'smooth',block:'start'})}
+function deselect(){
+  sel=null;renderList();renderForm();renderQbar();
+  $$('#msgs .sel').forEach(el=>el.classList.remove('sel'));
+}
 
 /* ---------- message list + form ---------- */
 function renderList(){
@@ -463,29 +588,34 @@ function select(id,scroll){
     if(el){sc.scrollTop=el.offsetTop-sc.clientHeight/2;updateGrad()}
     const li=$(`#list [data-id="${id}"]`); if(li) li.scrollIntoView({block:'nearest'});
   }
+  renderQbar();
 }
 $('#list').addEventListener('click',e=>{const li=e.target.closest('.li');if(li) select(li.dataset.id,true)});
-$('#msgs').addEventListener('click',e=>{
+$('#scroller').addEventListener('click',e=>{
   if(e.target.closest('[contenteditable]')) return;
-  const r=e.target.closest('[data-id]');if(r) select(r.dataset.id,false);
+  const r=e.target.closest('[data-id]');
+  if(r){if(r.dataset.id!==sel) select(r.dataset.id,false)} else if(sel) deselect();
 });
 $('#msgs').addEventListener('dblclick',e=>{
-  const t=e.target.closest('.txt');if(!t) return;
+  const t=e.target.closest('.txt,.emo,.svc span');if(!t) return;
   const m=getMsg(t.closest('[data-id]').dataset.id);if(!m) return;
+  startInline(t,m);
+});
+function startInline(t,m){
   t.textContent=m.text;
   t.contentEditable='plaintext-only'; if(t.contentEditable!=='plaintext-only') t.contentEditable='true';
   t.focus(); const r=document.createRange();r.selectNodeContents(t);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);
   let cancel=false;
   t.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();t.blur()}if(ev.key==='Escape'){cancel=true;t.blur()}};
   t.onblur=()=>{if(!cancel){m.text=t.innerText.replace(/\n$/,'');save()}renderPhone();renderList();if(sel===m.id)renderForm()};
-});
+}
 
 const form=$('#form');
 form.addEventListener('input',e=>{
   const k=e.target.dataset.m, m=getMsg(sel); if(!k||!m) return;
   m[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;
   renderPhone();renderList();save();
-  if(k==='from'||k==='type') renderForm();
+  if(k==='from'||k==='type'){renderForm();renderQbar()}
 });
 form.addEventListener('change',e=>{
   const m=getMsg(sel); if(!m) return;
@@ -497,16 +627,18 @@ form.addEventListener('change',e=>{
   }
 });
 form.addEventListener('click',e=>{
-  const a=e.target.closest('button[data-act]');if(!a) return;
+  const a=e.target.closest('button[data-act]');if(a) doAct(a.dataset.act);
+});
+function doAct(act){
   const i=S.messages.findIndex(m=>m.id===sel);if(i<0) return;
-  const act=a.dataset.act, ms=S.messages;
+  const ms=S.messages;
   if(act==='up'&&i>0){[ms[i-1],ms[i]]=[ms[i],ms[i-1]]}
   if(act==='down'&&i<ms.length-1){[ms[i+1],ms[i]]=[ms[i],ms[i+1]]}
   if(act==='dup'){const c={...ms[i],id:uid()};ms.splice(i+1,0,c);sel=c.id}
   if(act==='del'){ms.splice(i,1);sel=(ms[i]||ms[i-1]||{}).id||null}
   if(act==='rmimg'){ms[i].img=''}
-  renderPhone();renderList();renderForm();save();
-});
+  renderList();renderForm();renderQbar();renderPhone();save();
+}
 
 function lastTime(){for(let i=S.messages.length-1;i>=0;i--){if(S.messages[i].time) return S.messages[i].time}return nowTime()}
 function nowTime(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
@@ -578,9 +710,11 @@ const CF=[
   ['back','Số trên nút Back (để trống để ẩn)','text'],['avatarText','Chữ trên avatar','text'],
   ['avatarColor','Màu avatar','color'],['avatarImg','Ảnh avatar nhóm','file'],
   ['Tin nhắn'],
+  ['theme','Chế độ (thanh tiêu đề, chữ phụ)','select'],['fontSize','Cỡ chữ (px)','number'],
   ['showNames','Hiện tên người gửi (chat nhóm)','check'],['showAvatars','Hiện avatar người gửi bên trái','check'],
   ['out1','Bong bóng của bạn – màu trên','color'],['out2','Bong bóng của bạn – màu dưới','color'],
-  ['inColor','Bong bóng người khác','color'],['fontSize','Cỡ chữ (px)','number'],
+  ['outText','Chữ trong bong bóng của bạn','color'],['inText','Chữ trong bong bóng người khác','color'],
+  ['inColor','Bong bóng người khác','color'],
   ['Nền & kích thước'],
   ['bgColor','Màu nền','color'],['patternColor','Màu hoạ tiết','color'],
   ['pattern','Hiện hoạ tiết nền','check'],['bgImg','Ảnh nền riêng','file'],
@@ -593,16 +727,43 @@ function renderChatForm(){
     if(!l){flush();h+=`<div class="sect">${k}</div>`;return}
     if(t==='text'){flush();h+=`<label>${l}<input data-c="${k}" value="${esc(c[k])}"></label>`}
     else if(t==='color') grid.push(`<label>${l}<input type="color" data-c="${k}" value="${esc(c[k])}"></label>`);
+    else if(t==='select') grid.push(`<label>${l}<select data-c="${k}">${opts([['dark','🌙 Tối'],['light','☀️ Sáng']],c[k])}</select></label>`);
     else if(t==='number') grid.push(`<label>${l}<input type="number" data-c="${k}" value="${esc(c[k])}"></label>`);
     else if(t==='check') grid.push(`<label class="chk" style="padding-top:4px"><input type="checkbox" data-c="${k}"${c[k]?' checked':''}> ${l}</label>`);
     else if(t==='file') grid.push(`<div><span class="hint" style="display:block;margin:0 0 4px">${l}</span><div class="row-btns" style="margin:0"><label class="file">Chọn ảnh<input type="file" accept="image/*" data-cfile="${k}"></label>${c[k]?`<button data-cclear="${k}">Xoá</button>`:''}</div></div>`);
   });
   flush();$('#chatForm').innerHTML=h;
+  renderPresets();
 }
 $('#chatForm').addEventListener('input',e=>{
   const k=e.target.dataset.c;if(!k) return;
   S.chat[k]=e.target.type==='checkbox'?e.target.checked:e.target.type==='number'?+e.target.value:e.target.value;
-  renderPhone();save();
+  renderPhone();renderPresets();save();
+});
+
+/* ---------- Bộ màu có sẵn ---------- */
+const PRESETS=[
+  {name:'Tím đêm',theme:'dark',out1:'#9a5cf2',out2:'#5d6ef6',outText:'#ffffff',inColor:'#26262b',inText:'#ffffff',bgColor:'#08080b',patternColor:'#5b4596'},
+  {name:'Xanh đêm',theme:'dark',out1:'#4b8ff0',out2:'#2b62d6',outText:'#ffffff',inColor:'#1e2a38',inText:'#ffffff',bgColor:'#0d1622',patternColor:'#2c4a6e'},
+  {name:'Lục đêm',theme:'dark',out1:'#2fa572',out2:'#1d7f58',outText:'#ffffff',inColor:'#23272b',inText:'#ffffff',bgColor:'#0a110e',patternColor:'#2d5a46'},
+  {name:'Hồng đêm',theme:'dark',out1:'#e5609a',out2:'#a94bd8',outText:'#ffffff',inColor:'#2a2328',inText:'#ffffff',bgColor:'#0f0a0e',patternColor:'#6a3a5c'},
+  {name:'Sáng lá non',theme:'light',out1:'#e3fbcf',out2:'#d2f3b6',outText:'#0b1a05',inColor:'#ffffff',inText:'#111111',bgColor:'#d9e4c9',patternColor:'#93a87c'},
+  {name:'Sáng tím',theme:'light',out1:'#8d6cf2',out2:'#6c7ff5',outText:'#ffffff',inColor:'#ffffff',inText:'#111111',bgColor:'#ebe7f5',patternColor:'#ad9fd9'},
+  {name:'Sáng xanh dương',theme:'light',out1:'#4fa3f7',out2:'#3483e6',outText:'#ffffff',inColor:'#ffffff',inText:'#111111',bgColor:'#dbe5f0',patternColor:'#9db5cf'},
+  {name:'Trắng tối giản',theme:'light',out1:'#dbe9ff',out2:'#cfe1ff',outText:'#0a1a33',inColor:'#f1f1f4',inText:'#111111',bgColor:'#ffffff',patternColor:'#d4d4da'},
+];
+const presetKeys=['theme','out1','out2','outText','inColor','inText','bgColor','patternColor'];
+function renderPresets(){
+  $('#presets').innerHTML=PRESETS.map((p,i)=>{
+    const on=presetKeys.every(k=>String(S.chat[k]).toLowerCase()===p[k]);
+    return `<button class="preset${on?' on':''}" data-i="${i}"><span class="pv" style="background:${p.bgColor}"><i style="background:linear-gradient(90deg,${p.out1},${p.out2})"></i><i style="background:${p.inColor};${p.inColor==='#ffffff'||p.inColor===p.bgColor?'box-shadow:0 0 0 1px rgba(0,0,0,.12)':''}"></i></span>${p.name}</button>`;
+  }).join('');
+}
+$('#presets').addEventListener('click',e=>{
+  const b=e.target.closest('.preset');if(!b) return;
+  const p=PRESETS[+b.dataset.i];
+  presetKeys.forEach(k=>{S.chat[k]=p[k]});S.chat.pattern=true;
+  renderChatForm();renderPhone();save();
 });
 $('#chatForm').addEventListener('change',e=>{
   const k=e.target.dataset.cfile;if(!k) return;
@@ -657,15 +818,102 @@ $('#expJson').onclick=()=>{
   const url=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
   download(url,'chat-mockup.json');setTimeout(()=>URL.revokeObjectURL(url),2000);
 };
+$('#expAll').onclick=async()=>{
+  commit();await wq;
+  const chats=[];
+  for(const c of W.chats){
+    let d=null;
+    if(c.id===W.current) d=S; else {try{const raw=await DB.get('chat:'+c.id);d=typeof raw==='string'?JSON.parse(raw):raw}catch(e){}}
+    if(d) chats.push({name:c.name,data:d});
+  }
+  const url=URL.createObjectURL(new Blob([JSON.stringify({type:'chat-mockup-backup',version:1,chats})],{type:'application/json'}));
+  download(url,'chat-mockup-backup.json');setTimeout(()=>URL.revokeObjectURL(url),2000);
+};
 $('#impJson').onchange=e=>{
   const f=e.target.files[0];if(!f) return;
-  f.text().then(t=>{
-    const d=sanitize(JSON.parse(t));
-    if(!d) throw new Error('File không đúng định dạng');
-    S=d;sel=null;renderAllUI();save();
+  f.text().then(async t=>{
+    const d=JSON.parse(t);
+    if(d&&d.type==='chat-mockup-backup'&&Array.isArray(d.chats)){
+      const list=d.chats.map(c=>({name:String(c&&c.name||'Chat'),data:sanitize(c&&c.data)})).filter(c=>c.data);
+      if(!list.length) throw new Error('Không có cuộc chat hợp lệ');
+      for(let i=0;i<list.length;i++) await addChat(list[i].data,list[i].name,i===list.length-1);
+      alert(`Đã nhập ${list.length} cuộc chat.`);
+    }else{
+      const s=sanitize(d); if(!s) throw new Error('File không đúng định dạng');
+      await addChat(s,s.chat.title||f.name.replace(/\.json$/i,''));
+    }
   }).catch(err=>alert('Không nhập được: '+err.message));
   e.target.value='';
 };
+
+/* ---------- Nhiều cuộc chat ---------- */
+function blankChat(){
+  const d=sample();
+  d.chat.title='Cuộc trò chuyện mới';d.chat.subtitle='online';d.chat.avatarText='C';d.chat.back='';
+  d.people=[{id:'me',name:'Tôi',color:'#ffffff',badge:'',avatar:''},{id:uid(),name:'Người 1',color:PALETTE[0],badge:'',avatar:''}];
+  d.messages=[];return d;
+}
+function renderChatBar(){
+  $('#chatSel').innerHTML=W.chats.map(c=>`<option value="${c.id}"${c.id===W.current?' selected':''}>${esc(c.name)}</option>`).join('');
+  $('#chatDel').disabled=false;
+}
+async function openChat(id){
+  commit();await wq;
+  let d=null;
+  try{const raw=await DB.get('chat:'+id);d=sanitize(typeof raw==='string'?JSON.parse(raw):raw)}catch(e){}
+  W.current=id;S=d||blankChat();sel=null;composeFrom='me';
+  hist=[];fut=[];lastJ=JSON.stringify(S);
+  DB.set('index',W).catch(()=>{});
+  renderAllUI();renderChatBar();
+}
+async function addChat(data,name,open=true){
+  commit();await wq;
+  const id=uid();W.chats.push({id,name:name||data.chat.title||'Chat',updated:Date.now()});
+  try{await DB.set('chat:'+id,JSON.stringify(data));await DB.set('index',W)}
+  catch(e){alert('Không lưu được cuộc chat mới: '+(e&&(e.name||e.message)||e))}
+  if(open) await openChat(id); else renderChatBar();
+}
+$('#chatSel').onchange=e=>openChat(e.target.value);
+$('#chatNew').onclick=()=>addChat(blankChat(),'Cuộc trò chuyện '+(W.chats.length+1));
+$('#chatDup').onclick=()=>{commit();addChat(JSON.parse(JSON.stringify(S)),(curChat()?.name||'Chat')+' (bản sao)')};
+$('#chatRen').onclick=()=>{
+  const c=curChat();if(!c) return;
+  const n=prompt('Tên cuộc chat (chỉ để bạn phân biệt, không hiện trên ảnh):',c.name);
+  if(n!=null&&n.trim()){c.name=n.trim();DB.set('index',W).catch(()=>{});renderChatBar()}
+};
+$('#chatDel').onclick=async()=>{
+  const c=curChat();if(!c||!confirm(`Xoá cuộc chat “${c.name}”? Thao tác này không hoàn tác được.`)) return;
+  clearTimeout(saveT);lastJ=JSON.stringify(S);await wq;
+  W.chats=W.chats.filter(x=>x!==c);
+  await DB.del('chat:'+c.id).catch(()=>{});
+  if(!W.chats.length){
+    const id=uid();W.chats.push({id,name:'Cuộc trò chuyện 1',updated:Date.now()});
+    await DB.set('chat:'+id,JSON.stringify(blankChat())).catch(()=>{});
+  }
+  await openChat(W.chats[0].id);
+};
+async function boot(){
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  try{
+    let idx=await DB.get('index');
+    if(!idx||!Array.isArray(idx.chats)||!idx.chats.length){
+      let old=null;try{old=sanitize(JSON.parse(localStorage.getItem(KEY)))}catch(e){}   // dữ liệu từ bản cũ
+      const id=uid(), d=old||sample();
+      idx={chats:[{id,name:d.chat.title||'Chat 1',updated:Date.now()}],current:id};
+      await DB.set('chat:'+id,JSON.stringify(d));await DB.set('index',idx);
+      if(old) try{localStorage.removeItem(KEY)}catch(e){}
+    }
+    idx.chats=idx.chats.filter(c=>c&&okId(c.id)).map(c=>({id:c.id,name:String(c.name??'Chat'),updated:+c.updated||0}));
+    W={chats:idx.chats,current:idx.current};
+    if(!curChat()) W.current=W.chats[0].id;
+    ready=true;
+    await openChat(W.current);
+    note('Tự lưu bằng '+(await DB.kind())+' trong trình duyệt này · '+W.chats.length+' cuộc chat');
+  }catch(e){
+    ready=false;renderAllUI();
+    note('⚠ Không mở được bộ nhớ trình duyệt ('+(e&&(e.name||e.message)||e)+'). Thay đổi sẽ không được lưu – hãy dùng Xuất JSON.');
+  }
+}
 $('#clearMsgs').onclick=()=>{if(confirm('Xoá toàn bộ tin nhắn?')){S.messages=[];sel=null;renderAllUI();save()}};
 $('#resetAll').onclick=()=>{if(confirm('Khôi phục dữ liệu mẫu? Mọi thay đổi hiện tại sẽ mất.')){S=sample();sel=null;renderAllUI();save()}};
 
@@ -689,14 +937,16 @@ $('#btnPng').onclick=async()=>{
 $('#mclose').onclick=()=>{$('#modal').hidden=true};
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').hidden=true});
 
-function renderAllUI(keep='bottom'){renderPhone(keep);renderList();renderForm();renderPeople();renderChatForm();renderCompose();$('#cTime').value=lastTime();updUndo()}
-renderAllUI();
+function renderAllUI(keep='bottom'){renderQbar();renderPhone(keep);renderList();renderForm();renderPeople();renderChatForm();renderCompose();$('#cTime').value=lastTime();updUndo()}
+boot();
 
 $('#btnUndo').onclick=undo;$('#btnRedo').onclick=redo;
 document.addEventListener('keydown',e=>{
+  const t=e.target, inField=t.closest&&t.closest('input,textarea,select,[contenteditable]');
+  if(e.key==='Escape'&&!inField&&sel){deselect();return}
   if(!(e.ctrlKey||e.metaKey)||e.altKey) return;
-  const k=e.key.toLowerCase(), t=e.target;
-  if(t.closest&&t.closest('input,textarea,select,[contenteditable]')) return; // để ô nhập dùng hoàn tác riêng
+  const k=e.key.toLowerCase();
+  if(inField) return; // để ô nhập dùng hoàn tác riêng
   if(k==='z'&&!e.shiftKey){e.preventDefault();undo()}
   else if((k==='z'&&e.shiftKey)||k==='y'){e.preventDefault();redo()}
 });
