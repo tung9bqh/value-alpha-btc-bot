@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat Mockup Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<style>
+:root{
+  --ui-bg:#0f1014; --ui-panel:#17181e; --ui-line:#2a2c35; --ui-text:#e8e8ee; --ui-mute:#9a9cab;
+  --ui-acc:#8b6cf0; --ui-input:#101117;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ui-bg);color:var(--ui-text);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+button,.btn,label.file{font:inherit;color:var(--ui-text);background:#252733;border:1px solid var(--ui-line);
+  border-radius:8px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
+button:hover,.btn:hover,label.file:hover{background:#2e3140}
+button.primary,.btn.primary{background:var(--ui-acc);border-color:var(--ui-acc);color:#fff;font-weight:600}
+button.danger{color:#ff8a8a}
+label.file input{display:none}
+input,select,textarea{font:inherit;color:var(--ui-text);background:var(--ui-input);border:1px solid var(--ui-line);
+  border-radius:8px;padding:7px 9px;width:100%}
+input[type=color]{padding:2px;height:34px;cursor:pointer}
+input[type=checkbox]{width:auto}
+textarea{resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ui-acc);outline-offset:-1px}
+label{display:block;color:var(--ui-mute);font-size:12.5px}
+label>input,label>select,label>textarea{margin-top:4px}
+label.chk{display:flex;align-items:center;gap:7px;color:var(--ui-text);font-size:13.5px;padding-top:18px}
+fieldset{border:1px solid var(--ui-line);border-radius:10px;padding:8px 10px 10px;margin:10px 0 0}
+legend{color:var(--ui-mute);font-size:12px;padding:0 4px}
+.hint{color:var(--ui-mute);font-size:12.5px;margin:6px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.row-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+
+.app{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;justify-content:center;padding:20px 16px 40px}
+.stage{display:flex;flex-direction:column;gap:12px;align-items:center;max-width:100%}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.device{border-radius:30px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 0 1px #2a2c35;max-width:100%}
+.editor{flex:1 1 380px;max-width:540px;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:14px}
+.editor h1{font-size:17px;margin:0 0 2px}
+.tabs{display:flex;gap:4px;margin:12px 0;border-bottom:1px solid var(--ui-line)}
+.tabs button{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;padding:8px 10px;color:var(--ui-mute)}
+.tabs button.on{color:#fff;border-bottom-color:var(--ui-acc)}
+.pane{display:none}.pane.on{display:block}
+#list{max-height:280px;overflow:auto;border:1px solid var(--ui-line);border-radius:10px;background:var(--ui-input)}
+.li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:7px 10px;border-bottom:1px solid #1d1f27;cursor:pointer;align-items:baseline}
+.li:hover{background:#1a1c24}.li.on{background:#2a2350}
+.li .who{font-weight:600;font-size:12.5px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .sn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .tm{color:var(--ui-mute);font-size:12px}
+#form{margin-top:12px;display:grid;gap:8px}
+.pcard{display:flex;gap:10px;padding:10px;border:1px solid var(--ui-line);border-radius:10px;margin-bottom:8px;background:var(--ui-input)}
+.pcard .pf{flex:1;display:grid;gap:6px}
+.tag{font-size:12px;color:#c9b6ff}
+.sect{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ui-mute);margin:14px 0 6px}
+#chatForm{display:grid;gap:8px}
+
+.composer{width:100%;max-width:420px;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:10px;display:grid;gap:8px}
+.senders{display:flex;gap:6px;flex-wrap:wrap}
+.senders button{padding:4px 10px 4px 4px;border-radius:20px}
+.senders button.on{background:var(--ui-acc);border-color:var(--ui-acc);color:#fff}
+.crow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.crow input#cTime{width:90px}
+.save-note{font-size:12px;color:var(--ui-mute)}
+
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal[hidden]{display:none}
+.mbox{background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:14px;max-height:100%;overflow:auto;display:grid;gap:10px;justify-items:center}
+.mbox img{max-width:min(390px,100%);max-height:70vh;border-radius:8px}
+
+/* ================= CHAT SCREEN ================= */
+#screen{position:relative;width:min(var(--W),calc(100vw - 32px));height:var(--H);overflow:hidden;color:#fff;
+  background-color:var(--chatbg);background-image:var(--pat);background-size:var(--patsize);background-position:center;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;text-align:left}
+#scroller{position:absolute;inset:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none}
+#scroller::-webkit-scrollbar{display:none}
+#msgs{margin-top:auto;padding:94px 0 12px;display:flex;flex-direction:column}
+.hdr{position:absolute;left:0;right:0;top:0;z-index:5;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;
+  padding:16px 10px 26px;background:linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,0))}
+.pill{background:rgba(32,32,36,.94);border:1px solid rgba(255,255,255,.07);box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.back{height:48px;border-radius:24px;display:flex;align-items:center;gap:7px;padding:0 10px 0 16px}
+.back .cnt{font-size:17px;font-weight:600;background:rgba(255,255,255,.13);border-radius:13px;padding:1px 8px;line-height:24px}
+.ttl{justify-self:center;max-width:100%;min-width:0;border-radius:26px;padding:6px 16px 7px;text-align:center}
+.ttl .t{font-size:17px;font-weight:600;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttl .s{font-size:13px;line-height:17px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hav{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:500;overflow:hidden;
+  border:1px solid rgba(255,255,255,.08)}
+.hav img{width:100%;height:100%;object-fit:cover}
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;color:#fff;object-fit:cover;flex:none}
+
+.row{display:flex;align-items:flex-end;margin-top:2px;padding:0 8px}
+.row.first{margin-top:8px}
+.row.out{justify-content:flex-end;padding-right:16px}
+.row.in.noav{padding-left:16px}
+.ava-slot{width:36px;flex:none;margin-right:10px;display:flex}
+.bubble{position:relative;max-width:78%;padding:6px 12px 7px;border-radius:18px;font-size:var(--fs);line-height:calc(var(--fs) * 1.3);overflow-wrap:anywhere}
+.in .bubble{background:var(--in)}
+.out .bubble{max-width:84%}
+.out .bubble{background-image:linear-gradient(var(--out1),var(--out2));background-size:100% var(--H);
+  background-position:0 calc(var(--gy,0px) * -1);background-color:var(--out1)}
+.out:not(.first) .bubble{border-top-right-radius:7px}
+.out:not(.last) .bubble{border-bottom-right-radius:7px}
+.out.last .bubble{border-bottom-right-radius:0}
+.in:not(.first) .bubble{border-top-left-radius:7px}
+.in:not(.last) .bubble{border-bottom-left-radius:7px}
+.in.last .bubble{border-bottom-left-radius:0}
+.tail{position:absolute;bottom:0;width:11px;height:17px;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 17'%3E%3Cpath d='M0 0h3c0 8 3 13.5 8 17H0z'/%3E%3C/svg%3E") center/100% 100% no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 17'%3E%3Cpath d='M0 0h3c0 8 3 13.5 8 17H0z'/%3E%3C/svg%3E") center/100% 100% no-repeat}
+.out .tail{right:-8px;background-image:linear-gradient(var(--out1),var(--out2));background-size:100% var(--H);
+  background-position:0 calc((var(--gy,0px) + var(--bh,0px) - 17px) * -1);background-color:var(--out2)}
+.in .tail{left:-8px;transform:scaleX(-1);background:var(--in)}
+.name{font-size:15px;font-weight:600;line-height:20px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.txt{white-space:pre-wrap}
+.txt[contenteditable]{outline:1px dashed rgba(255,255,255,.6);outline-offset:2px;border-radius:3px}
+.meta{position:absolute;right:10px;bottom:5px;font-size:12px;line-height:14px;display:inline-flex;align-items:center;gap:3px;
+  color:rgba(255,255,255,.5);white-space:nowrap;pointer-events:none}
+.out .meta{color:rgba(255,255,255,.72)}
+.spacer{visibility:hidden;display:inline-flex;align-items:center;gap:3px;font-size:12px;line-height:14px;margin-left:12px;white-space:nowrap}
+.tk{display:block}
+.reply{display:block;margin:3px -4px 4px;padding:3px 9px 4px 10px;border-radius:7px;border-left:3px solid var(--rc);
+  background:color-mix(in srgb,var(--rc) 16%,transparent);font-size:15px;line-height:19px;min-width:0}
+.reply b{display:block;font-weight:600;color:var(--rc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reply span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.reacts{display:flex;flex-wrap:wrap;gap:6px;margin:5px 0 1px -4px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 4px 0 9px;border-radius:15px;font-size:17px;background:#3d8af7}
+.chip:not(:has(.av)){padding-right:9px}
+.chip b{font-size:14px;font-weight:600}
+.out .chip{background:rgba(255,255,255,.22)}
+.bubble.media{padding:3px}
+.bubble.media img{display:block;width:100%;border-radius:15px}
+.bubble.media .cap{padding:4px 9px 3px}
+.bubble.media.nocap .meta{right:9px;bottom:9px;background:rgba(0,0,0,.45);padding:2px 7px;border-radius:10px;color:#fff}
+.bubble.media .name{padding:2px 9px 3px}
+.sticker{position:relative;max-width:62%}
+.sticker img{display:block;width:190px;max-width:100%}
+.sticker .emo{font-size:120px;line-height:1.15}
+.sticker .meta{right:2px;bottom:4px;background:rgba(0,0,0,.5);padding:3px 7px;border-radius:10px;color:#fff}
+.svc{display:flex;justify-content:center;margin:10px 0 4px}
+.svc span{background:rgba(0,0,0,.42);padding:3px 11px;border-radius:12px;font-size:14px;font-weight:500;line-height:19px}
+.sel .bubble,.sel .sticker,.sel.svc span{outline:2px dashed #ffd54a;outline-offset:2px}
+#screen.exporting .sel .bubble,#screen.exporting .sel .sticker,#screen.exporting .sel.svc span{outline:none}
+.row,.svc{cursor:pointer}
+@media (max-width:600px){.grid3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="stage">
+    <div class="toolbar">
+      <button class="primary" id="btnPng">⬇ Xuất ảnh PNG</button>
+      <button id="btnBottom">⤓ Cuộn xuống cuối</button>
+    </div>
+    <div class="device"><div id="screen">
+      <div id="scroller"><div id="msgs"></div></div>
+      <div class="hdr" id="hdr"></div>
+    </div></div>
+    <div class="composer">
+      <div class="senders" id="senders"></div>
+      <textarea id="cText" rows="2" placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
+      <div class="crow">
+        <label style="display:flex;align-items:center;gap:6px">Giờ <input id="cTime" style="margin:0"></label>
+        <button id="cPlus" title="Cộng 1 phút">+1′</button>
+        <button id="cNow">Giờ hiện tại</button>
+        <label class="chk" style="padding:0"><input type="checkbox" id="cReply"> Trả lời tin đang chọn</label>
+        <button class="primary" id="cSend" style="margin-left:auto">Gửi ➤</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="editor">
+    <h1>Chat Mockup Studio</h1>
+    <div class="save-note" id="saveNote">Dữ liệu tự lưu trong trình duyệt này.</div>
+    <div class="tabs">
+      <button data-tab="msg" class="on">Tin nhắn</button>
+      <button data-tab="ppl">Người chat</button>
+      <button data-tab="ui">Giao diện &amp; dữ liệu</button>
+    </div>
+
+    <div class="pane on" id="pane-msg">
+      <div id="list"></div>
+      <div class="row-btns">
+        <button id="addMsg">＋ Thêm tin nhắn</button>
+        <button id="addDate">＋ Mốc ngày / thông báo</button>
+      </div>
+      <div id="form"></div>
+    </div>
+
+    <div class="pane" id="pane-ppl">
+      <p class="hint">“Bạn” là người có tin nhắn bên phải (màu tím). Những người khác hiện bên trái.</p>
+      <div id="people"></div>
+      <button id="addPerson">＋ Thêm người</button>
+    </div>
+
+    <div class="pane" id="pane-ui">
+      <div id="chatForm"></div>
+      <div class="sect">Dữ liệu</div>
+      <div class="row-btns">
+        <button id="expJson">Xuất JSON</button>
+        <label class="file">Nhập JSON<input type="file" id="impJson" accept="application/json,.json"></label>
+        <button id="clearMsgs" class="danger">Xoá hết tin nhắn</button>
+        <button id="resetAll" class="danger">Khôi phục mẫu</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div id="modal" hidden><div class="mbox">
+  <img id="mimg" alt="Ảnh chat đã xuất">
+  <div class="row-btns"><a class="btn primary" id="mdl" download="chat.png">Tải về PNG</a><button id="mclose">Đóng</button></div>
+  <p class="hint">Trên điện thoại: nhấn giữ ảnh để lưu vào Ảnh.</p>
+</div></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const KEY='chat-mockup-studio-v1';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>'x'+Math.random().toString(36).slice(2,9);
+const PALETTE=['#6ec6e8','#f2a65a','#9ccc65','#ef7d7d','#c48bf0','#4dd0c0','#f6c445'];
+
+function sample(){
+  return {
+    chat:{title:'Special 1:1 with Emilio Nuñez',subtitle:'3 members',back:'65',avatarText:'S',avatarColor:'#4caf50',avatarImg:'',
+      showNames:true,showAvatars:true,out1:'#9a5cf2',out2:'#5d6ef6',inColor:'#26262b',bgColor:'#08080b',
+      pattern:true,patternColor:'#5b4596',bgImg:'',width:390,height:844,fontSize:17},
+    people:[
+      {id:'me',name:'Money0x Mr',color:'#ffffff',badge:'',avatar:''},
+      {id:'p1',name:'Leite Mauricio',color:'#6ec6e8',badge:'★',avatar:''}
+    ],
+    messages:[
+      {id:uid(),from:'me',type:'text',text:'My plan',time:'15:18',status:'read',replyName:'Money0x Mr',replyText:'765xx'},
+      {id:uid(),from:'me',type:'text',text:'765 764',time:'15:18',status:'read'},
+      {id:uid(),from:'me',type:'text',text:'Sl 762',time:'15:18',status:'read'},
+      {id:uid(),from:'p1',type:'text',text:'This is definitely a very bearish setup; an assault on the 76,000 level will come soon.',time:'15:21'},
+      {id:uid(),from:'p1',type:'text',text:'Obviously, I’m not looking to short; I’m just protecting capital and lowering risk.',time:'15:27',reacts:'👍',reactBy:'me'},
+      {id:uid(),from:'me',type:'text',text:'understand.',time:'15:28',status:'read'},
+      {id:uid(),from:'me',type:'text',text:'hit',time:'15:43',status:'read',replyName:'Money0x Mr',replyText:'765 764'},
+      {id:uid(),from:'me',type:'sticker',text:'🐸',time:'15:43',status:'read'},
+      {id:uid(),from:'me',type:'text',text:'300 price SL, 1k2 price tp',time:'15:44',status:'read'}
+    ]
+  };
+}
+
+let S=null;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!Array.isArray(S.messages)||!Array.isArray(S.people)) S=sample();
+S.chat=Object.assign(sample().chat,S.chat||{});
+if(!S.people.find(p=>p.id==='me')) S.people.unshift({id:'me',name:'Tôi',color:'#ffffff'});
+let sel=null, composeFrom='me';
+
+let saveT;
+function save(){
+  clearTimeout(saveT);
+  saveT=setTimeout(()=>{
+    try{localStorage.setItem(KEY,JSON.stringify(S));$('#saveNote').textContent='Đã tự lưu trong trình duyệt này · '+new Date().toLocaleTimeString()}
+    catch(e){$('#saveNote').textContent='⚠ Không tự lưu được (có thể do ảnh quá lớn). Hãy dùng “Xuất JSON” để giữ dữ liệu.'}
+  },300);
+}
+
+const person=id=>S.people.find(p=>p.id===id)||S.people[0];
+const getMsg=id=>S.messages.find(m=>m.id===id);
+function initials(n){const w=String(n||'?').trim().split(/\s+/);return ([...(w[0]||'?')][0]+(w.length>1?[...w[w.length-1]][0]:'')).toUpperCase()}
+function avatarHTML(p,size){
+  if(p.avatar) return `<img class="av" src="${p.avatar}" style="width:${size}px;height:${size}px" alt="">`;
+  const c=p.id==='me'&&p.color.toLowerCase()==='#ffffff'?'#8b6cf0':p.color;
+  return `<div class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.4)}px;background:linear-gradient(color-mix(in srgb,${c} 65%,white),${c})">${esc(initials(p.name))}</div>`;
+}
+const TICK1='<svg class="tk" width="16" height="11" viewBox="0 0 16 11"><path d="M2.5 5.8l3 3L12 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const TICK2='<svg class="tk" width="18" height="11" viewBox="0 0 18 11"><path d="M1.5 5.8l3 3L11 2.3M7.7 8.2l.6.6L14.8 2.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function metaHTML(m,out){
+  const st=m.status||'read';
+  return `${m.edited?'<span>edited</span>':''}<span>${esc(m.time)}</span>${out?(st==='read'?TICK2:st==='sent'?TICK1:''):''}`;
+}
+function replyHTML(m,out){
+  if(!m.replyName&&!m.replyText) return '';
+  const rp=S.people.find(p=>p.name===m.replyName);
+  let c=out?'#ffffff':(rp?rp.color:'#6ec6e8');
+  if(!out&&c.toLowerCase()==='#ffffff') c='#b49cff';
+  return `<div class="reply" style="--rc:${c}"><b>${esc(m.replyName)}</b><span>${esc(m.replyText)}</span></div>`;
+}
+function reactsHTML(m){
+  if(!m.reacts) return '';
+  const items=m.reacts.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+  const by=m.reactBy&&S.people.find(p=>p.id===m.reactBy);
+  return items.map((it,i)=>{
+    const mm=it.match(/^(.+?)\s*(\d+)?$/u); const e=mm?mm[1]:it, c=mm&&mm[2];
+    return `<span class="chip">${esc(e)}${c?`<b>${c}</b>`:''}${i===0&&by?avatarHTML(by,24):''}</span>`;
+  }).join('');
+}
+function patternURL(c){
+  const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'><g fill='none' stroke='${c}' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' opacity='.38'>
+<path d='M40 24l4.7 9.6 10.6 1.5-7.7 7.5 1.8 10.5L40 48.1l-9.4 5 1.8-10.5-7.7-7.5 10.6-1.5z'/>
+<path d='M130 54c-8-6-16-12-16-19 0-5 4-8 8-8 3 0 6 2 8 5 2-3 5-5 8-5 4 0 8 3 8 8 0 7-8 13-16 19z'/>
+<circle cx='220' cy='38' r='11'/><circle cx='220' cy='38' r='4'/>
+<path d='M14 130q6-10 12 0t12 0t12 0t12 0'/>
+<path d='M110 142h40a8 8 0 0 0 0-16a12 12 0 0 0-22-4a9 9 0 0 0-18 8a6 6 0 0 0 0 12z'/>
+<path d='M226 112l-14 20h11l-6 18 18-24h-11l7-14z'/>
+<circle cx='40' cy='220' r='16'/><path d='M32 225q8 7 16 0'/><path d='M34 214v1M46 214v1'/>
+<path d='M130 204l12 16-12 16-12-16z'/>
+<path d='M214 236a6 5 0 1 1-1-3v-27l14 5'/>
+<path d='M85 82v6M82 85h6M175 172v6M172 175h6'/>
+<circle cx='175' cy='85' r='2.5'/><circle cx='85' cy='175' r='2.5'/>
+</g></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+/* ---------- render chat screen ---------- */
+function renderHeader(){
+  const c=S.chat;
+  $('#hdr').innerHTML=`
+    <div class="pill back"><svg width="12" height="20" viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>${c.back!==''?`<span class="cnt">${esc(c.back)}</span>`:''}</div>
+    <div class="pill ttl"><div class="t">${esc(c.title)}</div>${c.subtitle?`<div class="s">${esc(c.subtitle)}</div>`:''}</div>
+    <div class="hav" style="background:linear-gradient(color-mix(in srgb,${c.avatarColor} 70%,white),${c.avatarColor})">${c.avatarImg?`<img src="${c.avatarImg}" alt="">`:esc(c.avatarText)}</div>`;
+}
+function applyScreenVars(){
+  const c=S.chat, scr=$('#screen');
+  scr.style.setProperty('--W',(+c.width||390)+'px');
+  scr.style.setProperty('--H',(+c.height||844)+'px');
+  scr.style.setProperty('--fs',(+c.fontSize||17)+'px');
+  scr.style.setProperty('--out1',c.out1);scr.style.setProperty('--out2',c.out2);
+  scr.style.setProperty('--in',c.inColor);scr.style.setProperty('--chatbg',c.bgColor);
+  if(c.bgImg){scr.style.setProperty('--pat',`url("${c.bgImg}")`);scr.style.setProperty('--patsize','cover')}
+  else if(c.pattern){scr.style.setProperty('--pat',patternURL(c.patternColor));scr.style.setProperty('--patsize','260px')}
+  else{scr.style.setProperty('--pat','none')}
+}
+function renderMsgs(){
+  const ms=S.messages, c=S.chat; let h='';
+  ms.forEach((m,i)=>{
+    const sc=m.id===sel?' sel':'';
+    if(m.type==='date'){h+=`<div class="svc${sc}" data-id="${m.id}"><span>${esc(m.text)}</span></div>`;return}
+    const same=a=>a&&a.type!=='date'&&a.from===m.from;
+    const first=!same(ms[i-1]), last=!same(ms[i+1]);
+    const out=m.from==='me', p=person(m.from);
+    const showAv=!out&&c.showAvatars;
+    const meta=metaHTML(m,out), spacer=`<span class="spacer">${meta}</span>`;
+    const nameH=(!out&&first&&c.showNames)?`<div class="name" style="color:${p.color}">${esc(p.name)}${p.badge?` <span>${esc(p.badge)}</span>`:''}</div>`:'';
+    const reacts=reactsHTML(m);
+    const tail=last?'<span class="tail"></span>':'';
+    let body='';
+    if(m.type==='sticker'){
+      body=`<div class="sticker">${m.img?`<img src="${m.img}" alt="">`:`<div class="emo">${esc(m.text||'🙂')}</div>`}<span class="meta">${meta}</span></div>`;
+    }else if(m.type==='image'){
+      const cap=(m.text||'').trim()!==''||reacts;
+      body=`<div class="bubble media${cap?'':' nocap'}" style="width:min(270px,78%)">${nameH}${m.img?`<img src="${m.img}" alt="">`:'<div style="height:180px;display:flex;align-items:center;justify-content:center;opacity:.5">[Chưa chọn ảnh]</div>'}${cap?`<div class="cap">${m.text?`<div class="txt">${esc(m.text)}${reacts?'':spacer}</div>`:''}${reacts?`<div class="reacts">${reacts}${spacer}</div>`:''}</div>`:''}<span class="meta">${meta}</span>${tail}</div>`;
+    }else{
+      body=`<div class="bubble">${nameH}${replyHTML(m,out)}<div class="txt">${esc(m.text)}${reacts?'':spacer}</div>${reacts?`<div class="reacts">${reacts}${spacer}</div>`:''}<span class="meta">${meta}</span>${tail}</div>`;
+    }
+    h+=`<div class="row ${out?'out':'in'}${first?' first':''}${last?' last':''}${!out&&!showAv?' noav':''}${sc}" data-id="${m.id}">${showAv?`<div class="ava-slot">${last?avatarHTML(p,36):''}</div>`:''}${body}</div>`;
+  });
+  $('#msgs').innerHTML=h;
+}
+function renderPhone(keep='auto'){
+  const sc=$('#scroller');
+  const atBottom=sc.scrollHeight-sc.scrollTop-sc.clientHeight<6, st=sc.scrollTop;
+  applyScreenVars();renderHeader();renderMsgs();
+  if(keep==='bottom'||(keep==='auto'&&atBottom)) sc.scrollTop=sc.scrollHeight; else sc.scrollTop=st;
+  updateGrad();
+}
+function updateGrad(){
+  const scr=$('#screen'), top=scr.getBoundingClientRect().top;
+  $$('#msgs .out .bubble').forEach(b=>{
+    const r=b.getBoundingClientRect();
+    b.style.setProperty('--gy',(r.top-top)+'px');b.style.setProperty('--bh',r.height+'px');
+  });
+}
+$('#scroller').addEventListener('scroll',updateGrad,{passive:true});
+window.addEventListener('resize',updateGrad);
+
+/* ---------- message list + form ---------- */
+function renderList(){
+  $('#list').innerHTML=S.messages.map(m=>{
+    const p=person(m.from);
+    const snip=m.type==='date'?`— ${m.text} —`:(m.type==='image'?'🖼 ':'')+(m.type==='sticker'&&!m.text?'[sticker]':'')+(m.text||'');
+    return `<div class="li${m.id===sel?' on':''}" data-id="${m.id}"><span class="who" style="color:${m.type==='date'?'#999':(p.id==='me'?'#c9b6ff':p.color)}">${m.type==='date'?'Mốc':esc(p.name)}</span><span class="sn">${esc(snip)}</span><span class="tm">${esc(m.time||'')}</span></div>`;
+  }).join('')||'<p class="hint" style="padding:8px 10px">Chưa có tin nhắn nào.</p>';
+}
+const opts=(list,v)=>list.map(([k,l])=>`<option value="${esc(k)}"${k===v?' selected':''}>${esc(l)}</option>`).join('');
+function renderForm(){
+  const box=$('#form'), m=getMsg(sel);
+  if(!m){box.innerHTML='<p class="hint">Bấm vào một tin nhắn (trong khung chat hoặc danh sách) để sửa. Nhấp đúp vào chữ trong khung chat để sửa trực tiếp.</p>';return}
+  const ppl=opts(S.people.map(p=>[p.id,p.name+(p.id==='me'?' (bạn – bên phải)':'')]),m.from);
+  const others=S.messages.filter(x=>x.id!==m.id&&x.type!=='date').map(x=>[x.id,`${person(x.from).name}: ${x.type==='sticker'?'Sticker':x.type==='image'?'Ảnh':x.text}`.slice(0,70)]);
+  const isOut=m.from==='me';
+  box.innerHTML=`
+  <div class="grid2">
+    <label>Người gửi<select data-m="from">${ppl}</select></label>
+    <label>Loại<select data-m="type">${opts([['text','Văn bản'],['image','Ảnh'],['sticker','Sticker / emoji lớn'],['date','Mốc ngày / thông báo']],m.type)}</select></label>
+  </div>
+  <label>${m.type==='date'?'Nội dung mốc (vd: Today, 3 November)':m.type==='image'?'Chú thích ảnh':m.type==='sticker'?'Emoji (nếu không dùng ảnh)':'Nội dung'}<textarea data-m="text" rows="3">${esc(m.text)}</textarea></label>
+  ${m.type==='date'?'':`
+  <div class="grid3">
+    <label>Giờ<input data-m="time" value="${esc(m.time)}"></label>
+    ${isOut?`<label>Dấu tick<select data-m="status">${opts([['read','✓✓ Đã xem'],['sent','✓ Đã gửi'],['none','Không hiện']],m.status||'read')}</select></label>`:'<span></span>'}
+    <label class="chk"><input type="checkbox" data-m="edited"${m.edited?' checked':''}> “edited”</label>
+  </div>
+  ${m.type==='image'||m.type==='sticker'?`<div class="row-btns"><label class="file">📷 Chọn ảnh<input type="file" accept="image/*" data-mfile="img"></label>${m.img?'<button data-act="rmimg">Xoá ảnh</button>':''}</div>`:''}
+  ${m.type==='text'?`<fieldset><legend>Trích dẫn trả lời (để trống nếu không cần)</legend>
+    <div class="grid2"><label>Tên<input data-m="replyName" value="${esc(m.replyName)}"></label><label>Nội dung trích<input data-m="replyText" value="${esc(m.replyText)}"></label></div>
+    <label style="margin-top:6px">Lấy từ tin nhắn khác<select data-act="pickreply"><option value="">— chọn —</option>${opts(others,'')}</select></label>
+  </fieldset>`:''}
+  ${m.type==='sticker'?'':`<fieldset><legend>Reaction</legend>
+    <div class="grid2"><label>Emoji, cách nhau dấu phẩy (vd: 👍, 🔥3)<input data-m="reacts" value="${esc(m.reacts)}"></label>
+    <label>Avatar người thả<select data-m="reactBy">${opts([['','Không hiện'],...S.people.map(p=>[p.id,p.name])],m.reactBy||'')}</select></label></div>
+  </fieldset>`}`}
+  <div class="row-btns">
+    <button data-act="up">↑ Lên</button><button data-act="down">↓ Xuống</button>
+    <button data-act="dup">⧉ Nhân bản</button><button data-act="del" class="danger">🗑 Xoá</button>
+  </div>`;
+}
+function select(id,scroll){
+  sel=id;renderList();renderForm();
+  $$('#msgs [data-id]').forEach(el=>el.classList.toggle('sel',el.dataset.id===id));
+  showTab('msg');
+  if(scroll){
+    const el=$(`#msgs [data-id="${id}"]`),sc=$('#scroller');
+    if(el){sc.scrollTop=el.offsetTop-sc.clientHeight/2;updateGrad()}
+    const li=$(`#list [data-id="${id}"]`); if(li) li.scrollIntoView({block:'nearest'});
+  }
+}
+$('#list').addEventListener('click',e=>{const li=e.target.closest('.li');if(li) select(li.dataset.id,true)});
+$('#msgs').addEventListener('click',e=>{
+  if(e.target.closest('[contenteditable]')) return;
+  const r=e.target.closest('[data-id]');if(r) select(r.dataset.id,false);
+});
+$('#msgs').addEventListener('dblclick',e=>{
+  const t=e.target.closest('.txt');if(!t) return;
+  const m=getMsg(t.closest('[data-id]').dataset.id);if(!m) return;
+  t.textContent=m.text;
+  t.contentEditable='plaintext-only'; if(t.contentEditable!=='plaintext-only') t.contentEditable='true';
+  t.focus(); const r=document.createRange();r.selectNodeContents(t);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);
+  let cancel=false;
+  t.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();t.blur()}if(ev.key==='Escape'){cancel=true;t.blur()}};
+  t.onblur=()=>{if(!cancel){m.text=t.innerText.replace(/\n$/,'');save()}renderPhone();renderList();if(sel===m.id)renderForm()};
+});
+
+const form=$('#form');
+form.addEventListener('input',e=>{
+  const k=e.target.dataset.m, m=getMsg(sel); if(!k||!m) return;
+  m[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;
+  renderPhone();renderList();save();
+  if(k==='from'||k==='type') renderForm();
+});
+form.addEventListener('change',e=>{
+  const m=getMsg(sel); if(!m) return;
+  if(e.target.dataset.mfile){readImg(e.target.files[0],m.type==='sticker'?512:900,url=>{m.img=url;renderPhone();renderForm();save()})}
+  if(e.target.dataset.act==='pickreply'&&e.target.value){
+    const x=getMsg(e.target.value); m.replyName=person(x.from).name;
+    m.replyText=x.type==='sticker'?'Sticker':x.type==='image'?(x.text||'Photo'):x.text;
+    renderPhone();renderForm();save();
+  }
+});
+form.addEventListener('click',e=>{
+  const a=e.target.closest('button[data-act]');if(!a) return;
+  const i=S.messages.findIndex(m=>m.id===sel);if(i<0) return;
+  const act=a.dataset.act, ms=S.messages;
+  if(act==='up'&&i>0){[ms[i-1],ms[i]]=[ms[i],ms[i-1]]}
+  if(act==='down'&&i<ms.length-1){[ms[i+1],ms[i]]=[ms[i],ms[i+1]]}
+  if(act==='dup'){const c={...ms[i],id:uid()};ms.splice(i+1,0,c);sel=c.id}
+  if(act==='del'){ms.splice(i,1);sel=(ms[i]||ms[i-1]||{}).id||null}
+  if(act==='rmimg'){ms[i].img=''}
+  renderPhone();renderList();renderForm();save();
+});
+
+function lastTime(){for(let i=S.messages.length-1;i>=0;i--){if(S.messages[i].time) return S.messages[i].time}return nowTime()}
+function nowTime(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function addMin(t,n){
+  return String(t).replace(/(\d{1,2}):(\d{2})/,(_,h,mi)=>{let x=(+h*60+ +mi+n+1440)%1440;return String(Math.floor(x/60)).padStart(h.length,'0')+':'+String(x%60).padStart(2,'0')});
+}
+function insertMsg(m){
+  const i=S.messages.findIndex(x=>x.id===sel);
+  if(i>=0&&i<S.messages.length-1) S.messages.splice(i+1,0,m); else S.messages.push(m);
+  sel=m.id;renderPhone(i>=0&&i<S.messages.length-2?'keep':'bottom');renderList();renderForm();save();
+  select(m.id,true);
+}
+$('#addMsg').onclick=()=>insertMsg({id:uid(),from:composeFrom,type:'text',text:'Tin nhắn mới',time:getMsg(sel)?.time||lastTime(),status:'read'});
+$('#addDate').onclick=()=>insertMsg({id:uid(),from:'me',type:'date',text:'Today',time:''});
+
+/* ---------- people ---------- */
+function renderPeople(){
+  $('#people').innerHTML=S.people.map(p=>`
+  <div class="pcard" data-pid="${p.id}">
+    <div>${avatarHTML(p,44)}</div>
+    <div class="pf">
+      <div class="grid2"><label>Tên<input data-p="name" value="${esc(p.name)}"></label>
+      <label>Màu tên${p.id==='me'?' (dùng cho trích dẫn)':''}<input type="color" data-p="color" value="${esc(p.color)}"></label></div>
+      ${p.id==='me'?'':`<label>Huy hiệu sau tên (vd: ★, ✔, 👑)<input data-p="badge" value="${esc(p.badge)}"></label>`}
+      <div class="row-btns" style="margin-top:2px">
+        <label class="file">Ảnh đại diện<input type="file" accept="image/*" data-pfile="1"></label>
+        ${p.avatar?'<button data-pact="rmav">Xoá ảnh</button>':''}
+        ${p.id==='me'?'<span class="tag" style="align-self:center">Bạn · tin bên phải</span>':'<button class="danger" data-pact="rm">Xoá người</button>'}
+      </div>
+    </div>
+  </div>`).join('');
+}
+const pBox=$('#people');
+pBox.addEventListener('input',e=>{
+  const k=e.target.dataset.p;if(!k) return;
+  const p=S.people.find(x=>x.id===e.target.closest('[data-pid]').dataset.pid);
+  const old=p.name; p[k]=e.target.value;
+  if(k==='name') S.messages.forEach(m=>{if(m.replyName===old) m.replyName=p.name});
+  renderPhone();renderList();renderCompose();save();
+});
+pBox.addEventListener('change',e=>{
+  const p=S.people.find(x=>x.id===e.target.closest('[data-pid]')?.dataset.pid);if(!p) return;
+  if(e.target.dataset.pfile) readImg(e.target.files[0],256,url=>{p.avatar=url;renderPeople();renderPhone();renderCompose();save()});
+  if(e.target.dataset.p) {renderPeople();renderForm()}
+});
+pBox.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-pact]');if(!b) return;
+  const p=S.people.find(x=>x.id===b.closest('[data-pid]').dataset.pid);
+  if(b.dataset.pact==='rmav') p.avatar='';
+  if(b.dataset.pact==='rm'){
+    const n=S.messages.filter(m=>m.from===p.id&&m.type!=='date').length;
+    if(!confirm(`Xoá “${p.name}”${n?` và ${n} tin nhắn của người này`:''}?`)) return;
+    S.messages=S.messages.filter(m=>m.from!==p.id||m.type==='date');S.people=S.people.filter(x=>x!==p);
+    if(composeFrom===p.id) composeFrom='me';
+  }
+  renderPeople();renderPhone();renderList();renderForm();renderCompose();save();
+});
+$('#addPerson').onclick=()=>{
+  const n=S.people.length;
+  S.people.push({id:uid(),name:'Người '+n,color:PALETTE[(n-1)%PALETTE.length],badge:'',avatar:''});
+  renderPeople();renderCompose();renderForm();save();
+};
+
+/* ---------- chat settings ---------- */
+const CF=[
+  ['Thanh tiêu đề'],
+  ['title','Tên nhóm / người chat','text'],['subtitle','Dòng phụ (vd: 3 members, online, last seen recently)','text'],
+  ['back','Số trên nút Back (để trống để ẩn)','text'],['avatarText','Chữ trên avatar','text'],
+  ['avatarColor','Màu avatar','color'],['avatarImg','Ảnh avatar nhóm','file'],
+  ['Tin nhắn'],
+  ['showNames','Hiện tên người gửi (chat nhóm)','check'],['showAvatars','Hiện avatar người gửi bên trái','check'],
+  ['out1','Bong bóng của bạn – màu trên','color'],['out2','Bong bóng của bạn – màu dưới','color'],
+  ['inColor','Bong bóng người khác','color'],['fontSize','Cỡ chữ (px)','number'],
+  ['Nền & kích thước'],
+  ['bgColor','Màu nền','color'],['patternColor','Màu hoạ tiết','color'],
+  ['pattern','Hiện hoạ tiết nền','check'],['bgImg','Ảnh nền riêng','file'],
+  ['width','Chiều rộng khung (px)','number'],['height','Chiều cao khung (px)','number'],
+];
+function renderChatForm(){
+  const c=S.chat;let h='',grid=[];
+  const flush=()=>{if(grid.length){h+=`<div class="grid2">${grid.join('')}</div>`;grid=[]}};
+  CF.forEach(([k,l,t])=>{
+    if(!l){flush();h+=`<div class="sect">${k}</div>`;return}
+    if(t==='text'){flush();h+=`<label>${l}<input data-c="${k}" value="${esc(c[k])}"></label>`}
+    else if(t==='color') grid.push(`<label>${l}<input type="color" data-c="${k}" value="${esc(c[k])}"></label>`);
+    else if(t==='number') grid.push(`<label>${l}<input type="number" data-c="${k}" value="${esc(c[k])}"></label>`);
+    else if(t==='check') grid.push(`<label class="chk" style="padding-top:4px"><input type="checkbox" data-c="${k}"${c[k]?' checked':''}> ${l}</label>`);
+    else if(t==='file') grid.push(`<div><span class="hint" style="display:block;margin:0 0 4px">${l}</span><div class="row-btns" style="margin:0"><label class="file">Chọn ảnh<input type="file" accept="image/*" data-cfile="${k}"></label>${c[k]?`<button data-cclear="${k}">Xoá</button>`:''}</div></div>`);
+  });
+  flush();$('#chatForm').innerHTML=h;
+}
+$('#chatForm').addEventListener('input',e=>{
+  const k=e.target.dataset.c;if(!k) return;
+  S.chat[k]=e.target.type==='checkbox'?e.target.checked:e.target.type==='number'?+e.target.value:e.target.value;
+  renderPhone();save();
+});
+$('#chatForm').addEventListener('change',e=>{
+  const k=e.target.dataset.cfile;if(!k) return;
+  readImg(e.target.files[0],k==='bgImg'?1400:256,url=>{S.chat[k]=url;renderChatForm();renderPhone();save()});
+});
+$('#chatForm').addEventListener('click',e=>{
+  const k=e.target.dataset?.cclear;if(!k) return;S.chat[k]='';renderChatForm();renderPhone();save();
+});
+
+/* ---------- composer ---------- */
+function renderCompose(){
+  if(!S.people.find(p=>p.id===composeFrom)) composeFrom='me';
+  $('#senders').innerHTML=S.people.map(p=>`<button data-from="${p.id}" class="${p.id===composeFrom?'on':''}">${avatarHTML(p,24)}${esc(p.name)}</button>`).join('');
+}
+$('#senders').addEventListener('click',e=>{const b=e.target.closest('[data-from]');if(b){composeFrom=b.dataset.from;renderCompose();$('#cText').focus()}});
+function send(){
+  const t=$('#cText').value; if(!t.trim()) return;
+  const m={id:uid(),from:composeFrom,type:'text',text:t.replace(/\s+$/,''),time:$('#cTime').value||lastTime(),status:'read'};
+  const r=getMsg(sel);
+  if($('#cReply').checked&&r&&r.type!=='date'){m.replyName=person(r.from).name;m.replyText=r.type==='sticker'?'Sticker':r.type==='image'?(r.text||'Photo'):r.text;$('#cReply').checked=false}
+  S.messages.push(m);$('#cText').value='';
+  renderPhone('bottom');renderList();save();
+}
+$('#cSend').onclick=send;
+$('#cText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
+$('#cPlus').onclick=()=>{$('#cTime').value=addMin($('#cTime').value||lastTime(),1)};
+$('#cNow').onclick=()=>{$('#cTime').value=nowTime()};
+
+/* ---------- tabs, data, export ---------- */
+function showTab(t){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));$$('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+t))}
+$$('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$('#btnBottom').onclick=()=>{const sc=$('#scroller');sc.scrollTop=sc.scrollHeight;updateGrad()};
+
+function readImg(file,max,cb){
+  if(!file) return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const k=Math.min(1,max/Math.max(img.width,img.height));
+      const cv=document.createElement('canvas');cv.width=Math.round(img.width*k);cv.height=Math.round(img.height*k);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      const png=/png|gif|webp|svg/.test(file.type);
+      cb(cv.toDataURL(png?'image/png':'image/jpeg',.88));
+    };
+    img.src=fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove()}
+$('#expJson').onclick=()=>{
+  const url=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
+  download(url,'chat-mockup.json');setTimeout(()=>URL.revokeObjectURL(url),2000);
+};
+$('#impJson').onchange=e=>{
+  const f=e.target.files[0];if(!f) return;
+  f.text().then(t=>{
+    const d=JSON.parse(t);
+    if(!d||!Array.isArray(d.messages)||!Array.isArray(d.people)) throw new Error('File không đúng định dạng');
+    S=d;S.chat=Object.assign(sample().chat,S.chat||{});sel=null;renderAllUI();save();
+  }).catch(err=>alert('Không nhập được: '+err.message));
+  e.target.value='';
+};
+$('#clearMsgs').onclick=()=>{if(confirm('Xoá toàn bộ tin nhắn?')){S.messages=[];sel=null;renderAllUI();save()}};
+$('#resetAll').onclick=()=>{if(confirm('Khôi phục dữ liệu mẫu? Mọi thay đổi hiện tại sẽ mất.')){S=sample();sel=null;renderAllUI();save()}};
+
+$('#btnPng').onclick=async()=>{
+  if(!window.htmlToImage){alert('Chưa tải được thư viện xuất ảnh (cần kết nối Internet). Bạn vẫn có thể chụp màn hình trực tiếp.');return}
+  const scr=$('#screen'),sc=$('#scroller'),inner=$('#msgs'),st=sc.scrollTop,btn=$('#btnPng');
+  btn.disabled=true;btn.textContent='Đang xuất…';
+  scr.classList.add('exporting');sc.style.overflow='hidden';sc.scrollTop=0;inner.style.transform=`translateY(${-st}px)`;updateGrad();
+  try{
+    const o={pixelRatio:3,cacheBust:true,skipFonts:true};
+    await htmlToImage.toPng(scr,o);              // lần đầu để nạp ảnh (Safari)
+    const url=await htmlToImage.toPng(scr,o);
+    $('#mimg').src=url;$('#mdl').href=url;$('#mdl').download='chat-'+Date.now()+'.png';$('#modal').hidden=false;
+  }catch(err){alert('Lỗi xuất ảnh: '+(err&&err.message||err))}
+  finally{inner.style.transform='';sc.style.overflow='';sc.scrollTop=st;scr.classList.remove('exporting');updateGrad();btn.disabled=false;btn.textContent='⬇ Xuất ảnh PNG'}
+};
+$('#mclose').onclick=()=>{$('#modal').hidden=true};
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').hidden=true});
+
+function renderAllUI(){renderPhone('bottom');renderList();renderForm();renderPeople();renderChatForm();renderCompose();$('#cTime').value=lastTime()}
+renderAllUI();
+</script>
+</body>
+</html>
