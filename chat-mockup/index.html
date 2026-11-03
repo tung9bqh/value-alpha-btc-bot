@@ -12,6 +12,7 @@
   --ui-acc:#8b6cf0; --ui-input:#101117;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--ui-bg);color:var(--ui-text);touch-action:manipulation;
   font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 button,.btn,label.file{font:inherit;color:var(--ui-text);background:#252733;border:1px solid var(--ui-line);
@@ -66,6 +67,30 @@ button:disabled{opacity:.45;cursor:default}
 .senders button{padding:4px 10px 4px 4px;border-radius:20px}
 .senders button.on{background:var(--ui-acc);border-color:var(--ui-acc);color:#fff}
 .crow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ctypes{display:flex;gap:3px;background:var(--ui-input);border:1px solid var(--ui-line);border-radius:10px;padding:3px}
+.ctypes button{flex:1;justify-content:center;border:none;background:none;padding:7px 4px;font-size:13px;border-radius:7px}
+.ctypes button.on{background:var(--ui-acc);color:#fff;font-weight:600}
+.drop{border:2px dashed #3a3d4a;border-radius:12px;padding:14px;text-align:center;color:var(--ui-mute);cursor:pointer;transition:background .15s,border-color .15s}
+.drop[hidden]{display:none}
+.drop:hover,.drop:focus-visible{border-color:#5a5e70;outline:none}
+.drop.over{border-color:var(--ui-acc);background:rgba(139,108,240,.14);color:#fff}
+.drop b{color:var(--ui-text)}
+.coarse-only{display:none}
+@media (pointer:coarse){.coarse-only{display:inline}.fine-only{display:none}}
+.drop-prev{display:flex;align-items:center;gap:10px;justify-content:center}
+.drop-prev[hidden]{display:none}
+.drop-prev img{max-height:130px;max-width:60%;border-radius:8px;background:repeating-conic-gradient(#2a2c35 0 25%,#1e2028 0 50%) 0 0/16px 16px}
+.composer.dragging{outline:2px solid var(--ui-acc);outline-offset:2px}
+.ctext-wrap{position:relative}
+.ctext-wrap[hidden]{display:none}
+.ctext-wrap textarea{padding-right:44px;display:block}
+#cEmojiBtn{position:absolute;right:5px;top:5px;padding:4px 6px;background:none;border:none;font-size:19px}
+#cEmojiBtn.on{background:#2e3140}
+.emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:2px;max-height:176px;overflow:auto;
+  background:var(--ui-input);border:1px solid var(--ui-line);border-radius:10px;padding:4px}
+.emoji-grid[hidden]{display:none}
+.emoji-grid button{border:none;background:none;font-size:23px;padding:5px 0;justify-content:center;line-height:1}
+.emoji-grid button:hover{background:#2e3140}
 .crow input#cTime{width:90px}
 .save-note{font-size:12px;color:var(--ui-mute)}
 
@@ -206,12 +231,27 @@ button:disabled{opacity:.45;cursor:default}
     </div>
     <div class="composer">
       <div class="senders" id="senders"></div>
-      <textarea id="cText" rows="2" placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
+      <div class="ctypes" role="tablist" aria-label="Loại tin nhắn">
+        <button data-ct="text" class="on" role="tab">💬 Văn bản</button>
+        <button data-ct="image" role="tab">🖼️ Ảnh</button>
+        <button data-ct="sticker" role="tab">😀 Emoji / Sticker</button>
+      </div>
+      <div id="cDrop" class="drop" tabindex="0" role="button" hidden>
+        <input type="file" id="cFile" accept="image/*" hidden>
+        <div class="drop-empty"><b class="fine-only">⬇ Kéo-thả ảnh vào đây</b><b class="coarse-only">📷 Chạm để chọn ảnh</b><br><small class="fine-only">hoặc bấm để chọn ảnh · dán bằng Ctrl/⌘+V</small><small class="coarse-only">từ thư viện ảnh hoặc chụp mới</small></div>
+        <div class="drop-prev" hidden><img id="cPrev" alt="Ảnh sẽ gửi"><button id="cClearImg" type="button">✕ Bỏ ảnh</button></div>
+      </div>
+      <div id="cEmojiHint" class="hint" style="margin:0" hidden>Bấm một emoji để gửi ngay thành sticker lớn, hoặc dùng ô trên để thêm ảnh sticker riêng (PNG nền trong).</div>
+      <div class="ctext-wrap">
+        <textarea id="cText" rows="2" placeholder="Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
+        <button id="cEmojiBtn" type="button" title="Chèn emoji vào tin nhắn" aria-label="Chèn emoji">😊</button>
+      </div>
+      <div id="cEmoji" class="emoji-grid" hidden></div>
       <div class="crow">
         <label style="display:flex;align-items:center;gap:6px">Giờ <input id="cTime" style="margin:0"></label>
         <button id="cPlus" title="Cộng 1 phút">+1′</button>
         <button id="cNow">Giờ hiện tại</button>
-        <label class="chk" style="padding:0"><input type="checkbox" id="cReply"> Trả lời tin đang chọn</label>
+        <label class="chk" id="cReplyWrap" style="padding:0"><input type="checkbox" id="cReply"> Trả lời tin đang chọn</label>
         <button class="primary" id="cSend" style="margin-left:auto">Gửi ➤</button>
       </div>
     </div>
@@ -279,7 +319,10 @@ button:disabled{opacity:.45;cursor:default}
   <table>
     <tr><td class="ic">↶</td><td><b>Hoàn tác / Làm lại</b>Quay lại hoặc làm lại thao tác vừa rồi (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z). Nhớ 50 bước cho mỗi cuộc chat.</td></tr>
     <tr><td class="ic">⬇</td><td><b>Xuất ảnh PNG</b>Tạo ảnh chụp khung chat. Chọn “phần đang hiển thị” hoặc “toàn bộ hội thoại” ở ô bên cạnh. Trên điện thoại, nhấn giữ ảnh để lưu.</td></tr>
-    <tr><td class="ic">➤</td><td><b>Ô soạn tin</b>Chọn người gửi, gõ nội dung, chỉnh giờ rồi nhấn Gửi (hoặc Enter). Shift+Enter để xuống dòng.</td></tr>
+    <tr><td class="ic">➤</td><td><b>Ô soạn tin</b>Chọn người gửi, chọn loại tin, chỉnh giờ rồi nhấn Gửi (hoặc Enter). Shift+Enter để xuống dòng.</td></tr>
+    <tr><td class="ic">💬</td><td><b>Văn bản</b>Gõ tin nhắn bình thường. Nút 😊 trong ô gõ mở bảng emoji để chèn vào câu.</td></tr>
+    <tr><td class="ic">🖼️</td><td><b>Ảnh</b>Kéo-thả ảnh vào ô nét đứt (hoặc thả thẳng vào khung chat), dán bằng Ctrl/⌘+V, hoặc bấm vào ô để chọn ảnh. Có thể gõ chú thích, rồi bấm “Gửi ảnh”.</td></tr>
+    <tr><td class="ic">😀</td><td><b>Emoji / Sticker</b>Bấm một emoji là gửi ngay thành sticker lớn. Muốn dùng sticker riêng thì kéo-thả ảnh PNG nền trong vào ô, rồi bấm “Gửi sticker”.</td></tr>
     <tr><td class="ic">📂</td><td><b>Chọn cuộc chat</b>Ở đầu khung bên phải: tạo mới, nhân bản, đổi tên, xoá và chuyển giữa các cuộc chat.</td></tr>
   </table>
   <h3>Mẹo</h3>
@@ -835,16 +878,102 @@ function renderCompose(){
   $('#senders').innerHTML=S.people.map(p=>`<button data-from="${p.id}" class="${p.id===composeFrom?'on':''}">${avatarHTML(p,24)}${esc(p.name)}</button>`).join('');
 }
 $('#senders').addEventListener('click',e=>{const b=e.target.closest('[data-from]');if(b){composeFrom=b.dataset.from;renderCompose();$('#cText').focus()}});
-function send(){
-  const t=$('#cText').value; if(!t.trim()) return;
-  const m={id:uid(),from:composeFrom,type:'text',text:t.replace(/\s+$/,''),time:$('#cTime').value||lastTime(),status:'read'};
-  const r=getMsg(sel);
-  if($('#cReply').checked&&r&&r.type!=='date'){m.replyName=person(r.from).name;m.replyText=r.type==='sticker'?'Sticker':r.type==='image'?(r.text||'Photo'):r.text;$('#cReply').checked=false}
-  S.messages.push(m);$('#cText').value='';
+/* Ô soạn tin: 3 chế độ Văn bản / Ảnh / Emoji-Sticker */
+let composeType='text', pendingImg='';
+const EMOJIS=('😀 😁 😂 🤣 😅 😊 😍 😘 😎 🤩 🥳 😏 😌 🤔 🤨 😐 😴 🥲 😭 😱 😡 🤯 🙄 😬 '+
+  '👍 👎 👏 🙌 🙏 💪 🤝 👌 ✌️ 🤞 👀 🫡 ❤️ 🔥 💯 ✅ ❌ ⚠️ ⭐ 🎉 🎯 🚀 '+
+  '📈 📉 💰 💵 💸 💎 🪙 🏆 ⏰ 📌 🐸 🐳 🐂 🐻 🌙 ☕').split(' ');
+$('#cEmoji').innerHTML=EMOJIS.map(e=>`<button type="button" data-e="${e}" aria-label="${e}">${e}</button>`).join('');
+function setComposeType(t){
+  if(composeType!==t){pendingImg='';}
+  composeType=t;renderComposeMode();
+}
+function renderComposeMode(){
+  const t=composeType;
+  $$('.ctypes button').forEach(b=>{const on=b.dataset.ct===t;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
+  $('#cDrop').hidden=t==='text';
+  $('#cDrop .drop-empty').hidden=!!pendingImg;
+  $('.drop-prev').hidden=!pendingImg;
+  if(pendingImg) $('#cPrev').src=pendingImg;
+  $('#cDrop .drop-empty b.fine-only').textContent=t==='sticker'?'⬇ Kéo-thả ảnh sticker vào đây':'⬇ Kéo-thả ảnh vào đây';
+  $('#cDrop .drop-empty b.coarse-only').textContent=t==='sticker'?'📷 Chạm để chọn ảnh sticker':'📷 Chạm để chọn ảnh';
+  $('.ctext-wrap').hidden=t==='sticker';
+  $('#cText').placeholder=t==='image'?'Chú thích ảnh (không bắt buộc)…':'Nhập tin nhắn… (Enter để gửi, Shift+Enter xuống dòng)';
+  $('#cEmojiHint').hidden=t!=='sticker';
+  const gridOpen=t==='sticker'||$('#cEmojiBtn').classList.contains('on');
+  $('#cEmoji').hidden=!gridOpen;
+  $('#cReplyWrap').hidden=t!=='text';
+  const btn=$('#cSend');
+  btn.textContent=t==='image'?'Gửi ảnh ➤':t==='sticker'?'Gửi sticker ➤':'Gửi ➤';
+  btn.disabled=t!=='text'&&!pendingImg;
+}
+$('.ctypes').addEventListener('click',e=>{const b=e.target.closest('[data-ct]');if(b) setComposeType(b.dataset.ct)});
+$('#cEmojiBtn').onclick=()=>{$('#cEmojiBtn').classList.toggle('on');renderComposeMode()};
+$('#cEmoji').addEventListener('click',e=>{
+  const b=e.target.closest('[data-e]');if(!b) return;
+  if(composeType==='sticker'){pushMsg({type:'sticker',text:b.dataset.e});return}
+  const ta=$('#cText'), s0=ta.selectionStart??ta.value.length, s1=ta.selectionEnd??s0;   // chèn vào vị trí con trỏ
+  ta.value=ta.value.slice(0,s0)+b.dataset.e+ta.value.slice(s1);
+  ta.focus();ta.selectionStart=ta.selectionEnd=s0+b.dataset.e.length;
+});
+function loadComposeImg(file){
+  if(!file||!/^image\//.test(file.type)) return;
+  if(composeType==='text') setComposeType('image');
+  readImg(file,composeType==='sticker'?512:900,url=>{pendingImg=url;renderComposeMode()});
+}
+const drop=$('#cDrop');
+drop.addEventListener('click',e=>{if(!e.target.closest('#cClearImg')) $('#cFile').click()});
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('#cFile').click()}});
+$('#cFile').onchange=e=>{loadComposeImg(e.target.files[0]);e.target.value=''};
+$('#cClearImg').onclick=e=>{e.stopPropagation();pendingImg='';renderComposeMode()};
+/* Kéo-thả ảnh vào ô soạn tin hoặc thẳng vào khung chat */
+const hasFiles=e=>[...(e.dataTransfer?.types||[])].includes('Files');
+let dragDepth=0;
+[$('.composer'),$('.devwrap')].forEach(zone=>{
+  zone.addEventListener('dragenter',e=>{
+    if(!hasFiles(e)) return;e.preventDefault();dragDepth++;
+    if(composeType==='text') setComposeType('image');
+    $('.composer').classList.add('dragging');drop.classList.add('over');
+  });
+  zone.addEventListener('dragover',e=>{if(hasFiles(e)){e.preventDefault();e.dataTransfer.dropEffect='copy'}});
+  zone.addEventListener('dragleave',e=>{if(!hasFiles(e)) return;if(--dragDepth<=0){dragDepth=0;$('.composer').classList.remove('dragging');drop.classList.remove('over')}});
+  zone.addEventListener('drop',e=>{
+    if(!hasFiles(e)) return;e.preventDefault();dragDepth=0;
+    $('.composer').classList.remove('dragging');drop.classList.remove('over');
+    loadComposeImg([...e.dataTransfer.files].find(f=>/^image\//.test(f.type)));
+  });
+});
+/* Dán ảnh (Ctrl/⌘+V) */
+document.addEventListener('paste',e=>{
+  const f=[...(e.clipboardData?.files||[])].find(f=>/^image\//.test(f.type));if(!f) return;
+  const t=e.target;
+  if(t.closest&&t.closest('input,textarea,[contenteditable]')&&t.id!=='cText') return;
+  e.preventDefault();loadComposeImg(f);
+});
+function pushMsg(extra){
+  const m=Object.assign({id:uid(),from:composeFrom,type:'text',text:'',time:$('#cTime').value||lastTime(),status:'read'},extra);
+  S.messages.push(m);
   renderPhone('bottom');renderList();save();
+}
+function send(){
+  if(composeType==='image'){
+    if(!pendingImg) return;
+    pushMsg({type:'image',img:pendingImg,text:$('#cText').value.replace(/\s+$/,'')});
+    pendingImg='';$('#cText').value='';renderComposeMode();return;
+  }
+  if(composeType==='sticker'){
+    if(!pendingImg) return;
+    pushMsg({type:'sticker',img:pendingImg});pendingImg='';renderComposeMode();return;
+  }
+  const t=$('#cText').value; if(!t.trim()) return;
+  const extra={text:t.replace(/\s+$/,'')};
+  const r=getMsg(sel);
+  if($('#cReply').checked&&r&&r.type!=='date'){extra.replyName=person(r.from).name;extra.replyText=r.type==='sticker'?'Sticker':r.type==='image'?(r.text||'Photo'):r.text;$('#cReply').checked=false}
+  $('#cText').value='';pushMsg(extra);
 }
 $('#cSend').onclick=send;
 $('#cText').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
+renderComposeMode();
 $('#cPlus').onclick=()=>{$('#cTime').value=addMin($('#cTime').value||lastTime(),1)};
 $('#cNow').onclick=()=>{$('#cTime').value=nowTime()};
 
