@@ -69,8 +69,8 @@ button:disabled{opacity:.45;cursor:default}
 .crow input#cTime{width:90px}
 .save-note{font-size:12px;color:var(--ui-mute)}
 
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
-#modal[hidden]{display:none}
+#modal,#help{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal[hidden],#help[hidden]{display:none}
 .mbox{background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:14px;max-height:100%;overflow:auto;display:grid;gap:10px;justify-items:center}
 .mbox img{max-width:min(390px,100%);max-height:70vh;border-radius:8px}
 .chatbar{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
@@ -82,12 +82,27 @@ button:disabled{opacity:.45;cursor:default}
 .pv i{display:block;height:12px;border-radius:6px;width:62%}
 .pv i:first-child{align-self:flex-end}
 .devwrap{position:relative;max-width:100%}
-#qbar{position:absolute;z-index:20;display:flex;align-items:center;gap:1px;padding:4px;background:rgba(23,24,30,.97);
-  border:1px solid var(--ui-line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#qbar{position:absolute;z-index:20;display:flex;flex-direction:column;gap:4px;padding:6px;background:#17181e;
+  border:1px solid var(--ui-line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:calc(100% - 8px)}
 #qbar[hidden]{display:none}
-#qbar button{padding:6px 8px;border:none;background:none;font-size:15px;line-height:1}
+.qtop{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-mute);padding:0 2px}
+.qtop .qtime{width:70px;padding:4px 6px;font-size:13px;margin:0}
+#qbar .qhelp{margin-left:auto;font-size:12px;padding:4px 9px;background:#252733;border:1px solid var(--ui-line);border-radius:8px}
+.qbtns{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(48px,1fr);gap:2px}
+#qbar .qbtns button{flex-direction:column;gap:3px;min-width:0;padding:6px 3px 5px;border:none;background:none;font-size:17px;line-height:1;border-radius:8px}
+#qbar .qbtns button small{font-size:10.5px;color:#c4c6d2;line-height:1.1;white-space:nowrap}
+#qbar .qbtns button.danger small{color:#ff9c9c}
 #qbar button:hover{background:#2e3140}
-#qbar .qtime{width:64px;padding:4px 6px;font-size:13px;margin:0 3px 0 1px}
+#qbar .qx{padding:4px 9px;font-size:12px;background:#252733;border:1px solid var(--ui-line);border-radius:8px}
+.help-box{max-width:560px;justify-items:stretch;text-align:left}
+.help-box h2{font-size:17px;margin:0}
+.help-box h3{font-size:14px;margin:6px 0 0}
+.help-box table{border-collapse:collapse;width:100%}
+.help-box td{padding:7px 6px;border-top:1px solid var(--ui-line);vertical-align:top;font-size:13.5px}
+.help-box td.ic{font-size:20px;width:34px;text-align:center}
+.help-box td b{display:block;margin-bottom:2px}
+.help-box ul{margin:0;padding-left:18px;font-size:13.5px}
+.help-box li{margin:3px 0}
 
 /* ================= CHAT SCREEN ================= */
 #screen{--pill-bg:rgba(32,32,36,.94);--pill-txt:#fff;--pill-line:rgba(255,255,255,.07);--hdr-fade:rgba(0,0,0,.6);
@@ -180,6 +195,7 @@ button:disabled{opacity:.45;cursor:default}
         <option value="full">Xuất: toàn bộ hội thoại</option>
       </select>
       <button class="primary" id="btnPng">⬇ Xuất ảnh PNG</button>
+      <button id="btnHelp" title="Giải thích các nút">❓ Hướng dẫn</button>
     </div>
     <div class="devwrap">
       <div class="device"><div id="screen">
@@ -252,6 +268,28 @@ button:disabled{opacity:.45;cursor:default}
   <img id="mimg" alt="Ảnh chat đã xuất">
   <div class="row-btns"><a class="btn primary" id="mdl" download="chat.png">Tải về PNG</a><button id="mclose">Đóng</button></div>
   <p class="hint">Trên điện thoại: nhấn giữ ảnh để lưu vào Ảnh.</p>
+</div></div>
+
+<div id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle"><div class="mbox help-box">
+  <h2 id="helpTitle" tabindex="-1" style="outline:none">Hướng dẫn sử dụng</h2>
+  <p class="hint" style="margin:0">Chạm vào một tin nhắn trong khung chat để hiện <b>thanh sửa nhanh</b> ngay cạnh tin đó.</p>
+  <h3>Thanh sửa nhanh</h3>
+  <table id="helpTable"></table>
+  <h3>Các nút khác</h3>
+  <table>
+    <tr><td class="ic">↶</td><td><b>Hoàn tác / Làm lại</b>Quay lại hoặc làm lại thao tác vừa rồi (Ctrl/⌘+Z, Ctrl/⌘+Shift+Z). Nhớ 50 bước cho mỗi cuộc chat.</td></tr>
+    <tr><td class="ic">⬇</td><td><b>Xuất ảnh PNG</b>Tạo ảnh chụp khung chat. Chọn “phần đang hiển thị” hoặc “toàn bộ hội thoại” ở ô bên cạnh. Trên điện thoại, nhấn giữ ảnh để lưu.</td></tr>
+    <tr><td class="ic">➤</td><td><b>Ô soạn tin</b>Chọn người gửi, gõ nội dung, chỉnh giờ rồi nhấn Gửi (hoặc Enter). Shift+Enter để xuống dòng.</td></tr>
+    <tr><td class="ic">📂</td><td><b>Chọn cuộc chat</b>Ở đầu khung bên phải: tạo mới, nhân bản, đổi tên, xoá và chuyển giữa các cuộc chat.</td></tr>
+  </table>
+  <h3>Mẹo</h3>
+  <ul>
+    <li>Nhấp đúp vào chữ trong tin nhắn cũng sửa trực tiếp được.</li>
+    <li>Chạm vào chỗ trống trong khung chat hoặc nhấn Esc để bỏ chọn tin.</li>
+    <li>Trong danh sách tin nhắn (bên phải), kéo-thả để đổi thứ tự.</li>
+    <li>Dữ liệu chỉ lưu trong trình duyệt đang dùng. Muốn chuyển máy, dùng “Xuất sao lưu” rồi “Nhập” ở máy kia.</li>
+  </ul>
+  <div class="row-btns" style="justify-content:flex-end"><button class="primary" id="helpClose">Đã hiểu</button></div>
 </div></div>
 
 <script>
@@ -481,17 +519,34 @@ $('#scroller').addEventListener('scroll',()=>{updateGrad();placeQbar()},{passive
 window.addEventListener('resize',()=>{updateGrad();placeQbar()});
 
 /* ---------- Thanh sửa nhanh nổi cạnh tin đang chọn ---------- */
+/* Một nguồn duy nhất cho nút trên thanh sửa nhanh và bảng Hướng dẫn → luôn khớp nhau */
+const QTIME={icon:'🕑',label:'Giờ gửi',desc:'Giờ hiện trên tin nhắn. Gõ giờ mới (vd: 15:43) là tin đổi ngay.'};
+const QACT=[
+  {q:'edit',icon:'✏️',label:'Sửa chữ',desc:'Sửa nội dung tin ngay trên khung chat. Gõ xong nhấn Enter (hoặc chạm ra ngoài) để lưu, Esc để huỷ, Shift+Enter để xuống dòng.'},
+  {q:'who',icon:'👤',label:'Đổi người',desc:'Chuyển tin sang người gửi khác; bấm nhiều lần để xoay vòng qua từng người. Tin của “bạn” nằm bên phải, của người khác nằm bên trái.',noDate:true},
+  {q:'reply',icon:'↩️',label:'Trả lời',desc:'Soạn tin mới có khung trích dẫn tin này. Con trỏ nhảy xuống ô soạn tin bên dưới, gõ nội dung rồi nhấn Gửi.',noDate:true},
+  {q:'dup',icon:'⧉',label:'Nhân bản',desc:'Tạo bản sao của tin ngay bên dưới, giữ nguyên nội dung, giờ và người gửi.'},
+  {q:'del',icon:'🗑️',label:'Xoá',desc:'Xoá tin này. Lỡ tay thì bấm “↶ Hoàn tác” trên thanh công cụ.',danger:true},
+  {q:'more',icon:'⚙️',label:'Chi tiết',desc:'Mở form đầy đủ: đổi loại tin (ảnh, sticker, mốc ngày), dấu ✓✓, nhãn “edited”, trích dẫn, reaction…'},
+  {q:'close',icon:'✕',label:'Đóng',desc:'Bỏ chọn tin và ẩn thanh này (giống chạm vào chỗ trống hoặc nhấn Esc).'},
+];
 function renderQbar(){
   const q=$('#qbar'), m=getMsg(sel);
   if(!m){q.hidden=true;q.innerHTML='';return}
   const isDate=m.type==='date';
-  q.innerHTML=`${isDate?'':`<input class="qtime" value="${esc(m.time)}" title="Giờ gửi" aria-label="Giờ gửi">`}
-    <button data-q="edit" title="Sửa chữ ngay trên khung chat">✎</button>
-    ${isDate?'':'<button data-q="who" title="Đổi người gửi">👤</button><button data-q="reply" title="Soạn tin trả lời tin này">↩</button>'}
-    <button data-q="dup" title="Nhân bản">⧉</button><button data-q="del" title="Xoá">🗑</button>
-    <button data-q="more" title="Mở form sửa chi tiết">⋯</button><button data-q="close" title="Bỏ chọn (Esc)">✕</button>`;
+  q.innerHTML=`<div class="qtop">${isDate?'<span>Mốc ngày / thông báo</span>':`<label for="qtime" style="color:inherit;font-size:12px">${QTIME.icon} ${QTIME.label}</label><input id="qtime" class="qtime" value="${esc(m.time)}">`}
+      <button class="qhelp" data-q="help" title="Giải thích từng nút">❓ Hướng dẫn</button><button class="qx" data-q="close" title="${esc(QACT.at(-1).desc)}">✕ Đóng</button></div>
+    <div class="qbtns">${QACT.filter(a=>a.q!=='close'&&!(isDate&&a.noDate)).map(a=>`<button data-q="${a.q}"${a.danger?' class="danger"':''} title="${esc(a.desc)}" aria-label="${esc(a.label)}">${a.icon}<small>${a.label}</small></button>`).join('')}</div>`;
   placeQbar();
 }
+function openHelp(){
+  $('#helpTable').innerHTML=[QTIME,...QACT].map(a=>`<tr><td class="ic">${a.icon}</td><td><b>${esc(a.label)}</b>${esc(a.desc)}</td></tr>`).join('')
+    +'<tr><td class="ic">❓</td><td><b>Hướng dẫn</b>Mở bảng giải thích này.</td></tr>';
+  $('#help').hidden=false;$('#help .mbox').scrollTop=0;$('#helpTitle').focus({preventScroll:true});
+}
+const closeHelp=()=>{$('#help').hidden=true};
+$('#btnHelp').onclick=openHelp;$('#helpClose').onclick=closeHelp;
+$('#help').addEventListener('click',e=>{if(e.target.id==='help') closeHelp()});
 function placeQbar(){
   const q=$('#qbar'), m=getMsg(sel), row=m&&$(`#msgs [data-id="${sel}"]`);
   if(!row||!q.innerHTML){q.hidden=true;return}
@@ -531,6 +586,7 @@ $('#qbar').addEventListener('click',e=>{
   if(a==='dup'||a==='del') doAct(a);
   if(a==='more') openForm();
   if(a==='close') deselect();
+  if(a==='help') openHelp();
 });
 function openForm(){showTab('msg');$('#form').scrollIntoView({behavior:'smooth',block:'start'})}
 function deselect(){
@@ -943,6 +999,7 @@ boot();
 $('#btnUndo').onclick=undo;$('#btnRedo').onclick=redo;
 document.addEventListener('keydown',e=>{
   const t=e.target, inField=t.closest&&t.closest('input,textarea,select,[contenteditable]');
+  if(e.key==='Escape'&&!$('#help').hidden){closeHelp();return}
   if(e.key==='Escape'&&!inField&&sel){deselect();return}
   if(!(e.ctrlKey||e.metaKey)||e.altKey) return;
   const k=e.key.toLowerCase();
