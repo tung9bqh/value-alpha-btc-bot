@@ -47,7 +47,7 @@ legend{color:var(--ui-mute);font-size:12px;padding:0 4px}
 .tabs button{background:none;border:none;border-bottom:2px solid transparent;border-radius:0;padding:8px 10px;color:var(--ui-mute)}
 .tabs button.on{color:#fff;border-bottom-color:var(--ui-acc)}
 .pane{display:none}.pane.on{display:block}
-#list{max-height:280px;overflow:auto;border:1px solid var(--ui-line);border-radius:10px;background:var(--ui-input)}
+#list,#llist{max-height:280px;overflow:auto;border:1px solid var(--ui-line);border-radius:10px;background:var(--ui-input)}
 .li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:7px 10px;border-bottom:1px solid #1d1f27;cursor:pointer;align-items:baseline}
 .li:hover{background:#1a1c24}.li.on{background:#2a2350}
 .li.drop-above{box-shadow:inset 0 2px 0 var(--ui-acc)}.li.drop-below{box-shadow:inset 0 -2px 0 var(--ui-acc)}
@@ -217,12 +217,57 @@ button:disabled{opacity:.45;cursor:default}
 .sel .bubble,.sel .sticker,.sel.svc span{outline:2px dashed #ffd54a;outline-offset:2px}
 #screen.exporting .sel .bubble,#screen.exporting .sel .sticker,#screen.exporting .sel.svc span{outline:none}
 .row,.svc{cursor:pointer}
+/* ----- Màn hình danh sách chat ----- */
+.vswitch{display:flex;gap:3px;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:10px;padding:3px}
+.vswitch button{border:none;background:none;padding:7px 12px;border-radius:7px;font-size:13px}
+.vswitch button.on{background:var(--ui-acc);color:#fff;font-weight:600}
+#screen.listmode .hdr{background:var(--l-bg);padding:0;display:block}
+#screen.listmode #msgs{margin-top:0;padding:0 0 8px}
+#screen.listmode.withhdr #msgs{padding-top:54px}
+.lhdr{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:var(--l-name);border-bottom:.5px solid color-mix(in srgb,var(--l-sub) 30%,transparent)}
+.lhdr .lh-l{color:var(--l-acc);font-size:17px;min-width:60px}
+.lhdr .lh-t{font-size:17px;font-weight:600}
+.lhdr .lh-r{color:var(--l-acc);min-width:60px;display:flex;justify-content:flex-end}
+.lrow{display:flex;gap:11px;align-items:center;height:72px;padding:0 10px 0 8px;cursor:pointer;color:var(--l-name)}
+.lrow.hl-selected{background:var(--l-sel)}
+.lrow.hl-hover{background:var(--l-hov)}
+.lrow.sel{outline:2px dashed #ffd54a;outline-offset:-3px}
+#screen.exporting .lrow.sel{outline:none}
+.lav{position:relative;flex:none}
+.lon{position:absolute;right:0;bottom:1px;width:14px;height:14px;border-radius:50%;background:#4cd964;border:2.5px solid var(--l-bg)}
+.hl-selected .lon{border-color:var(--l-sel)}.hl-hover .lon{border-color:var(--l-hov)}
+.lbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.l1,.l2{display:flex;align-items:center;gap:5px;min-width:0}
+.ln{font-weight:600;font-size:16px;line-height:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lbadge{flex:none;font-size:15px;line-height:1}
+.lver{flex:none;display:block}
+.lmute{flex:none;color:var(--l-sub)}
+.lright{margin-left:auto;display:flex;align-items:center;gap:4px;flex:none;color:var(--l-sub);font-size:14px;padding-left:6px}
+.ltk{color:var(--l-acc);display:flex}
+.lt{flex:1;min-width:0;display:flex;align-items:center;gap:5px;color:var(--l-sub);font-size:15px;line-height:20px}
+.lt.acc{color:var(--l-acc)}
+.lt svg{flex:none}
+.ltx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.lpre{color:var(--l-name);flex:none}
+.ldraft{color:#e5534b;flex:none}
+.lthumb{width:20px;height:20px;border-radius:3px;object-fit:cover;flex:none}
+.lunread{flex:none;margin-left:auto;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--l-acc);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.lunread.muted{background:color-mix(in srgb,var(--l-sub) 70%,transparent)}
+.lpin{flex:none;margin-left:auto;color:var(--l-sub)}
+.hl-selected .ln,.hl-selected .lt,.hl-selected .lright,.hl-selected .ltk,.hl-selected .lpre,.hl-selected .lpin,.hl-selected .lmute{color:#fff}
+.hl-selected .lunread{background:#fff;color:var(--l-sel)}
+.ln[contenteditable],.ltx[contenteditable],.ltime[contenteditable]{outline:1px dashed currentColor;outline-offset:2px;text-overflow:clip}
+.lcomposer{width:100%;max-width:420px;background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:14px;padding:10px;display:grid;gap:6px}
 @media (max-width:600px){.grid3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div class="app">
   <section class="stage">
+    <div class="vswitch" role="tablist" aria-label="Chọn màn hình">
+      <button data-v="chat" class="on" role="tab">💬 Màn hình chat</button>
+      <button data-v="list" role="tab">📋 Danh sách chat</button>
+    </div>
     <div class="toolbar">
       <button id="btnUndo" title="Hoàn tác (Ctrl/⌘+Z)" disabled>↶ Hoàn tác</button>
       <button id="btnRedo" title="Làm lại (Ctrl/⌘+Shift+Z)" disabled>↷ Làm lại</button>
@@ -249,6 +294,10 @@ button:disabled{opacity:.45;cursor:default}
       <button data-sc="down" title="Cuộn xuống một đoạn" aria-label="Cuộn xuống">▼</button>
       <button data-sc="bottom" title="Xuống cuối hội thoại" aria-label="Xuống cuối hội thoại">⤓</button>
     </div>
+    </div>
+    <div class="lcomposer" id="lcomposer" hidden>
+      <button class="primary" id="addL2">＋ Thêm cuộc trò chuyện vào danh sách</button>
+      <p class="hint" style="margin:0">Chạm vào một dòng để sửa ở khung bên phải. Nhấp đúp vào <b>tên</b>, <b>nội dung</b> hoặc <b>giờ</b> để sửa ngay trên màn hình.</p>
     </div>
     <div class="composer">
       <div class="senders" id="senders"></div>
@@ -291,6 +340,7 @@ button:disabled{opacity:.45;cursor:default}
     <div class="tabs">
       <button data-tab="msg" class="on">Tin nhắn</button>
       <button data-tab="ppl">Người chat</button>
+      <button data-tab="lst">Danh sách chat</button>
       <button data-tab="ui">Giao diện &amp; dữ liệu</button>
     </div>
 
@@ -307,6 +357,15 @@ button:disabled{opacity:.45;cursor:default}
       <p class="hint">“Bạn” là người có tin nhắn bên phải (màu tím). Những người khác hiện bên trái.</p>
       <div id="people"></div>
       <button id="addPerson">＋ Thêm người</button>
+    </div>
+
+    <div class="pane" id="pane-lst">
+      <div id="llist"></div>
+      <div class="row-btns"><button id="addL">＋ Thêm cuộc trò chuyện</button></div>
+      <div id="lform"></div>
+      <div class="sect">Giao diện danh sách</div>
+      <div class="presets" id="lpresets"></div>
+      <div id="lstyle" style="display:grid;gap:8px;margin-top:8px"></div>
     </div>
 
     <div class="pane" id="pane-ui">
@@ -347,6 +406,11 @@ button:disabled{opacity:.45;cursor:default}
     <tr><td class="ic">😀</td><td><b>Emoji / Sticker</b>Bấm một emoji là gửi ngay thành sticker lớn. Muốn dùng sticker riêng thì kéo-thả ảnh PNG nền trong vào ô, rồi bấm “Gửi sticker”.</td></tr>
     <tr><td class="ic">📂</td><td><b>Chọn cuộc chat</b>Ở đầu khung bên phải: tạo mới, nhân bản, đổi tên, xoá và chuyển giữa các cuộc chat.</td></tr>
   </table>
+  <h3>Màn hình danh sách chat</h3>
+  <table>
+    <tr><td class="ic">📋</td><td><b>Danh sách chat</b>Bấm “📋 Danh sách chat” ở trên khung (hoặc tab “Danh sách chat”) để chuyển sang màn hình danh sách. Chạm vào một dòng để sửa tên, ảnh, nội dung, ngày giờ, dấu tick, số tin chưa đọc… ở khung bên phải. Nhấp đúp vào tên, nội dung hoặc giờ để sửa ngay trên màn hình.</td></tr>
+    <tr><td class="ic">🎨</td><td><b>Giao diện danh sách</b>Cuối tab “Danh sách chat”: chọn bộ màu có sẵn, bật/tắt thanh tiêu đề, đổi màu nền, màu dòng được chọn, màu nhấn.</td></tr>
+  </table>
   <h3>Mẹo</h3>
   <ul>
     <li>Nhấp đúp vào chữ trong tin nhắn cũng sửa trực tiếp được.</li>
@@ -364,8 +428,29 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const uid=()=>'x'+Math.random().toString(36).slice(2,9);
 const PALETTE=['#6ec6e8','#f2a65a','#9ccc65','#ef7d7d','#c48bf0','#4dd0c0','#f6c445'];
 
+const LTYPES=['text','photo','file','call','forward','draft','typing'];
+const LIST_STYLES=[
+  {name:'Đêm xanh',bg:'#17212b',selBg:'#2b5278',hoverBg:'#202b36',accent:'#6ab2f2',nameColor:'#ffffff',subColor:'#7f91a4'},
+  {name:'Đen',bg:'#000000',selBg:'#2c2c2e',hoverBg:'#141416',accent:'#3e88f7',nameColor:'#ffffff',subColor:'#8d8e93'},
+  {name:'Xám đêm',bg:'#212121',selBg:'#766ac8',hoverBg:'#2c2c2c',accent:'#8774e1',nameColor:'#ffffff',subColor:'#aaaaaa'},
+  {name:'Sáng',bg:'#ffffff',selBg:'#3390ec',hoverBg:'#f4f4f5',accent:'#3390ec',nameColor:'#000000',subColor:'#707579'},
+];
+function sampleList(){
+  const it=(o)=>Object.assign({id:uid(),name:'',avatar:'',color:'#7e8fa3',badge:'none',badgeText:'',time:'',status:'none',type:'text',prefix:'',text:'',thumb:'',unread:0,pinned:false,muted:false,online:false,hl:'none'},o);
+  return Object.assign({},LIST_STYLES[0],{showHeader:false,title:'Chats',leftText:'Edit',items:[
+    it({name:'Nhóm VIP 1-1',color:'#8b6cf0',time:'23:56',status:'sent',text:'Vào lệnh thôi anh em',hl:'selected'}),
+    it({name:'Minh Anh',color:'#e9905a',time:'20:06',text:'BTC hôm nay sao rồi',online:true}),
+    it({name:'Trader Pro',color:'#5a7de9',time:'15:12',status:'sent',type:'call',text:'Canceled call'}),
+    it({name:'Linh Nguyễn',color:'#e55f8a',badge:'verified',time:'Mon',type:'photo',text:'Photo'}),
+    it({name:'Hoàng Nam',color:'#4fb37e',time:'26/10/26',text:'Mình trao đổi về cách xử lý lệnh nhé',hl:'hover'}),
+    it({name:'Tuấn Kiệt',color:'#5aa7e9',badge:'verified',time:'20/10/26',type:'file',text:'bao-cao.pdf'}),
+    it({name:'Quỳnh Chi',color:'#4cb0c4',time:'2/10/26',status:'read',text:'Chiều nay 16h'}),
+    it({name:'David',color:'#d8a14a',time:'30/9/26',type:'forward',text:'https://example.com/tin-tuc'}),
+    it({name:'Phạm Đức',color:'#6cbf5a',time:'23/9/26',status:'read',text:'Oke a',unread:3,pinned:true}),
+  ]});
+}
 function sample(){
-  return {
+  return {list:sampleList(),
     chat:{title:'Special 1:1 with Emilio Nuñez',subtitle:'3 members',back:'65',avatarText:'S',avatarColor:'#4caf50',avatarImg:'',
       showNames:true,showAvatars:true,out1:'#9a5cf2',out2:'#5d6ef6',inColor:'#26262b',bgColor:'#08080b',
       pattern:true,patternColor:'#5b4596',bgImg:'',width:390,height:844,fontSize:17,
@@ -410,7 +495,17 @@ function sanitize(d){
     text:String(m.text??''), time:String(m.time??''), status:['read','sent','none'].includes(m.status)?m.status:'read',
     edited:!!m.edited, replyName:String(m.replyName??''), replyText:String(m.replyText??''),
     reacts:String(m.reacts??''), reactBy:ids.has(m.reactBy)?m.reactBy:'', img:okImg(m.img)?m.img:''}));
-  return {chat:c,people,messages};
+  const dl=sampleList(), L=Object.assign({},dl,(d.list&&typeof d.list==='object')?d.list:{});
+  ['bg','selBg','hoverBg','accent','nameColor','subColor'].forEach(k=>{if(!okColor(L[k])) L[k]=dl[k]});
+  L.showHeader=!!L.showHeader;L.title=String(L.title??'');L.leftText=String(L.leftText??'');
+  L.items=(Array.isArray(L.items)?L.items:dl.items).filter(x=>x&&typeof x==='object').map(x=>({
+    id:okId(x.id)?x.id:uid(), name:String(x.name??''), avatar:okImg(x.avatar)?x.avatar:'', color:okColor(x.color)?x.color:'#7e8fa3',
+    badge:['none','verified','custom'].includes(x.badge)?x.badge:'none', badgeText:String(x.badgeText??''),
+    time:String(x.time??''), status:['none','sent','read'].includes(x.status)?x.status:'none',
+    type:LTYPES.includes(x.type)?x.type:'text', prefix:String(x.prefix??''), text:String(x.text??''), thumb:okImg(x.thumb)?x.thumb:'',
+    unread:Math.max(0,Math.min(99999,parseInt(x.unread)||0)), pinned:!!x.pinned, muted:!!x.muted, online:!!x.online,
+    hl:['none','selected','hover'].includes(x.hl)?x.hl:'none'}));
+  return {chat:c,people,messages,list:L};
 }
 
 /* ---------- Lưu trữ: IndexedDB (chứa được hàng trăm MB), dự phòng localStorage ---------- */
@@ -527,8 +622,36 @@ function renderHeader(){
     <div class="pill ttl"><div class="t">${esc(c.title)}</div>${c.subtitle?`<div class="s">${esc(c.subtitle)}</div>`:''}</div>
     <div class="hav" style="background:linear-gradient(color-mix(in srgb,${c.avatarColor} 70%,white),${c.avatarColor})">${c.avatarImg?`<img src="${c.avatarImg}" alt="">`:esc(c.avatarText)}</div>`;
 }
+const LICON={
+  verified:'<svg class="lver" width="19" height="19" viewBox="0 0 24 24"><path fill="var(--l-acc)" d="M12 1.5l2.6 1.9 3.2-.1 1 3.1 2.6 1.9-1 3.1 1 3.1-2.6 1.9-1 3.1-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3.1-2.6-1.9 1-3.1-1-3.1 2.6-1.9 1-3.1 3.2.1z"/><path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  file:'<svg width="16" height="18" viewBox="0 0 16 18"><path fill="currentColor" d="M2 0h7.5L15 5.5V16a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/><path fill="var(--l-bg)" opacity=".35" d="M9 0v5a1 1 0 0 0 1 1h5z"/></svg>',
+  call:'<svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.6 21 3 13.4 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/><path d="M15 3.5h5.5V9M20.5 3.5L14.5 9.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  forward:'<svg width="17" height="15" viewBox="0 0 24 20"><path fill="currentColor" d="M14 0l10 9-10 9v-5.2C7 12.8 2.7 14.6 0 19c1.2-6.6 5-11.8 14-12.6z"/></svg>',
+  pin:'<svg class="lpin" width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 2.5l6 6-2.2.9-3.6 3.6.7 4.6-1.9 1.9-4-4-5.6 5.6-1.3-1.3 5.6-5.6-4-4 1.9-1.9 4.6.7 3.6-3.6z"/></svg>',
+  mute:'<svg class="lmute" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9z"/><path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  compose:'<svg width="24" height="24" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z M14 6l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>'
+};
+let lsel=null, view='chat';
+try{if(localStorage.getItem('cms:view')==='list') view='list'}catch(e){}
+const getL=id=>S.list.items.find(x=>x.id===id);
+function lPreviewText(it){return it.text||({photo:'Photo',call:'Canceled call',typing:'typing…',file:'File'}[it.type]||'')}
+function renderListRows(){
+  return S.list.items.map(it=>{
+    const ticks=it.status==='read'?TICK2:it.status==='sent'?TICK1:'';
+    const badge=it.badge==='verified'?LICON.verified:it.badge==='custom'&&it.badgeText?`<span class="lbadge">${esc(it.badgeText)}</span>`:'';
+    const acc=['photo','file','call','typing'].includes(it.type);
+    const pre=it.type==='photo'?(it.thumb?`<img class="lthumb" src="${it.thumb}" alt="">`:''):it.type==='file'?LICON.file:it.type==='call'?LICON.call:it.type==='forward'?LICON.forward:it.type==='draft'?'<span class="ldraft">Draft:</span>':'';
+    const right2=it.unread?`<span class="lunread${it.muted?' muted':''}">${it.unread}</span>`:it.pinned?LICON.pin:'';
+    return `<div class="lrow hl-${it.hl}${it.id===lsel?' sel':''}" data-lid="${it.id}">`+
+      `<div class="lav">${avatarHTML({id:'l',name:it.name,color:it.color,avatar:it.avatar},54)}${it.online?'<i class="lon"></i>':''}</div>`+
+      `<div class="lbody"><div class="l1"><span class="ln">${esc(it.name)}</span>${badge}${it.muted?LICON.mute:''}<span class="lright">${ticks?`<span class="ltk">${ticks}</span>`:''}<span class="ltime">${esc(it.time)}</span></span></div>`+
+      `<div class="l2"><span class="lt${acc?' acc':''}">${it.prefix?`<span class="lpre">${esc(it.prefix)}</span>`:''}${pre}<span class="ltx">${esc(lPreviewText(it))}</span></span>${right2}</div></div></div>`;
+  }).join('');
+}
 function applyScreenVars(){
-  const c=S.chat, scr=$('#screen');
+  const c=S.chat, scr=$('#screen'), L=S.list, lm=view==='list';
+  scr.classList.toggle('listmode',lm);scr.classList.toggle('withhdr',lm&&L.showHeader);
+  [['--l-bg',L.bg],['--l-sel',L.selBg],['--l-hov',L.hoverBg],['--l-acc',L.accent],['--l-name',L.nameColor],['--l-sub',L.subColor]].forEach(([k,v])=>scr.style.setProperty(k,v));
   scr.style.setProperty('--W',(+c.width||390)+'px');
   scr.style.setProperty('--H',(+c.height||844)+'px');
   scr.style.setProperty('--fs',(+c.fontSize||17)+'px');
@@ -536,7 +659,8 @@ function applyScreenVars(){
   scr.style.setProperty('--in',c.inColor);scr.style.setProperty('--chatbg',c.bgColor);
   scr.style.setProperty('--txt-out',c.outText);scr.style.setProperty('--txt-in',c.inText);
   scr.classList.toggle('light',c.theme==='light');
-  if(c.bgImg){scr.style.setProperty('--pat',`url("${c.bgImg}")`);scr.style.setProperty('--patsize','cover')}
+  if(lm){scr.style.setProperty('--chatbg',L.bg);scr.style.setProperty('--pat','none')}
+  else if(c.bgImg){scr.style.setProperty('--pat',`url("${c.bgImg}")`);scr.style.setProperty('--patsize','cover')}
   else if(c.pattern){scr.style.setProperty('--pat',patternURL(c.patternColor));scr.style.setProperty('--patsize','260px')}
   else{scr.style.setProperty('--pat','none')}
 }
@@ -569,8 +693,14 @@ function renderMsgs(){
 function renderPhone(keep='auto'){
   const sc=$('#scroller');
   const atBottom=sc.scrollHeight-sc.scrollTop-sc.clientHeight<6, st=sc.scrollTop;
-  applyScreenVars();renderHeader();renderMsgs();
-  if(keep==='bottom'||(keep==='auto'&&atBottom)) sc.scrollTop=sc.scrollHeight; else sc.scrollTop=st;
+  applyScreenVars();
+  if(view==='list'){
+    const L=S.list;
+    $('#hdr').innerHTML=L.showHeader?`<div class="lhdr"><span class="lh-l">${esc(L.leftText)}</span><span class="lh-t">${esc(L.title)}</span><span class="lh-r">${LICON.compose}</span></div>`:'';
+    $('#msgs').innerHTML=renderListRows();
+  }else{renderHeader();renderMsgs()}
+  if(keep==='top') sc.scrollTop=0;
+  else if(keep==='bottom'||(keep==='auto'&&atBottom)) sc.scrollTop=sc.scrollHeight; else sc.scrollTop=st;
   updateGrad();placeQbar();updRail();
 }
 function updateGrad(){
@@ -750,21 +880,24 @@ function select(id,scroll){
 $('#list').addEventListener('click',e=>{const li=e.target.closest('.li');if(li) select(li.dataset.id,true)});
 $('#scroller').addEventListener('click',e=>{
   if(e.target.closest('[contenteditable]')) return;
+  if(view==='list'){const lr=e.target.closest('[data-lid]');if(lr){if(lr.dataset.lid!==lsel) selectL(lr.dataset.lid,false)}else if(lsel) deselectL();return}
   const r=e.target.closest('[data-id]');
   if(r){if(r.dataset.id!==sel) select(r.dataset.id,false)} else if(sel) deselect();
 });
 $('#msgs').addEventListener('dblclick',e=>{
+  const lt=e.target.closest('.ln,.ltx,.ltime');
+  if(lt){const it=getL(lt.closest('[data-lid]').dataset.lid);if(it) startInline(lt,it,lt.classList.contains('ln')?'name':lt.classList.contains('ltime')?'time':'text');return}
   const t=e.target.closest('.txt,.emo,.svc span');if(!t) return;
   const m=getMsg(t.closest('[data-id]').dataset.id);if(!m) return;
   startInline(t,m);
 });
-function startInline(t,m){
-  t.textContent=m.text;
+function startInline(t,m,key='text'){
+  t.textContent=m[key];
   t.contentEditable='plaintext-only'; if(t.contentEditable!=='plaintext-only') t.contentEditable='true';
   t.focus(); const r=document.createRange();r.selectNodeContents(t);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);
   let cancel=false;
   t.onkeydown=ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();t.blur()}if(ev.key==='Escape'){cancel=true;t.blur()}};
-  t.onblur=()=>{if(!cancel){m.text=t.innerText.replace(/\n$/,'');save()}renderPhone();renderList();if(sel===m.id)renderForm()};
+  t.onblur=()=>{if(!cancel){m[key]=t.innerText.replace(/\n$/,'');save()}renderPhone();renderList();if(sel===m.id)renderForm();renderLlist();if(lsel===m.id)renderLform()};
 }
 
 const form=$('#form');
@@ -989,21 +1122,21 @@ const hasFiles=e=>[...(e.dataTransfer?.types||[])].includes('Files');
 let dragDepth=0;
 [$('.composer'),$('.devwrap')].forEach(zone=>{
   zone.addEventListener('dragenter',e=>{
-    if(!hasFiles(e)) return;e.preventDefault();dragDepth++;
+    if(!hasFiles(e)||view==='list') return;e.preventDefault();dragDepth++;
     if(composeType==='text') setComposeType('image');
     $('.composer').classList.add('dragging');drop.classList.add('over');
   });
   zone.addEventListener('dragover',e=>{if(hasFiles(e)){e.preventDefault();e.dataTransfer.dropEffect='copy'}});
   zone.addEventListener('dragleave',e=>{if(!hasFiles(e)) return;if(--dragDepth<=0){dragDepth=0;$('.composer').classList.remove('dragging');drop.classList.remove('over')}});
   zone.addEventListener('drop',e=>{
-    if(!hasFiles(e)) return;e.preventDefault();dragDepth=0;
+    if(!hasFiles(e)||view==='list') return;e.preventDefault();dragDepth=0;
     $('.composer').classList.remove('dragging');drop.classList.remove('over');
     loadComposeImg([...e.dataTransfer.files].find(f=>/^image\//.test(f.type)));
   });
 });
 /* Dán ảnh (Ctrl/⌘+V) */
 document.addEventListener('paste',e=>{
-  const f=[...(e.clipboardData?.files||[])].find(f=>/^image\//.test(f.type));if(!f) return;
+  const f=[...(e.clipboardData?.files||[])].find(f=>/^image\//.test(f.type));if(!f||view==='list') return;
   const t=e.target;
   if(t.closest&&t.closest('input,textarea,[contenteditable]')&&t.id!=='cText') return;
   e.preventDefault();loadComposeImg(f);
@@ -1037,7 +1170,125 @@ $('#cNow').onclick=()=>{$('#cTime').value=nowTime()};
 
 /* ---------- tabs, data, export ---------- */
 function showTab(t){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));$$('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+t))}
-$$('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$$('.tabs button').forEach(b=>b.onclick=()=>{
+  const t=b.dataset.tab;showTab(t);
+  if(t==='lst') setView('list'); else if(t==='msg') setView('chat');
+});
+
+/* ---------- Chuyển màn hình: chat ⇄ danh sách ---------- */
+function setView(v){
+  if(view===v){applyViewUI();return}
+  view=v;try{localStorage.setItem('cms:view',v)}catch(e){}
+  if(v==='list'){if(sel) deselect()} else if(lsel) deselectL();
+  applyViewUI();renderPhone(v==='list'?'top':'bottom');
+}
+function applyViewUI(){
+  $$('.vswitch button').forEach(b=>{const on=b.dataset.v===view;b.classList.toggle('on',on);b.setAttribute('aria-selected',on)});
+  $('.composer').hidden=view==='list';$('#lcomposer').hidden=view!=='list';
+  const cur=$('.tabs button.on')?.dataset.tab;
+  if(view==='list'&&cur==='msg') showTab('lst'); else if(view==='chat'&&cur==='lst') showTab('msg');
+}
+$('.vswitch').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b) setView(b.dataset.v)});
+
+/* ---------- Danh sách chat: chọn & sửa ---------- */
+function selectL(id,scroll){
+  lsel=id;renderLlist();renderLform();showTab('lst');
+  $$('#msgs [data-lid]').forEach(el=>el.classList.toggle('sel',el.dataset.lid===id));
+  if(scroll){const el=$(`#msgs [data-lid="${id}"]`),sc=$('#scroller');if(el){sc.scrollTop=el.offsetTop-sc.clientHeight/2}
+    $(`#llist [data-lid="${id}"]`)?.scrollIntoView({block:'nearest'})}
+  if(innerWidth<900&&!scroll) $('#lform').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function deselectL(){lsel=null;renderLlist();renderLform();$$('#msgs .lrow.sel').forEach(el=>el.classList.remove('sel'))}
+function renderLlist(){
+  $('#llist').innerHTML=S.list.items.map(it=>`<div class="li${it.id===lsel?' on':''}" data-lid="${it.id}"><span class="who" style="color:${it.color}">${esc(it.name||'(không tên)')}</span><span class="sn">${esc((it.prefix?it.prefix+' ':'')+lPreviewText(it))}</span><span class="tm">${esc(it.time)}</span></div>`).join('')
+    ||'<p class="hint" style="padding:8px 10px">Danh sách trống.</p>';
+}
+$('#llist').addEventListener('click',e=>{const li=e.target.closest('[data-lid]');if(li){setView('list');selectL(li.dataset.lid,true)}});
+function renderLform(){
+  const box=$('#lform'), it=getL(lsel);
+  if(!it){box.innerHTML='<p class="hint">Chọn một dòng (trong khung hoặc danh sách trên) để sửa tên, ảnh, nội dung và ngày giờ.</p>';return}
+  box.innerHTML=`
+  <div class="pcard" style="margin:10px 0 0"><div>${avatarHTML({id:'l',name:it.name,color:it.color,avatar:it.avatar},48)}</div>
+    <div class="pf">
+      <div class="grid2"><label>Tên<input data-l="name" value="${esc(it.name)}"></label><label>Màu avatar (khi không có ảnh)<input type="color" data-l="color" value="${esc(it.color)}"></label></div>
+      <div class="row-btns" style="margin:0"><label class="file">📷 Ảnh đại diện<input type="file" accept="image/*" data-lfile="avatar"></label>${it.avatar?'<button data-lact="rmavatar">Xoá ảnh</button>':''}</div>
+    </div></div>
+  <div class="grid2">
+    <label>Huy hiệu sau tên<select data-l="badge">${opts([['none','Không có'],['verified','✔ Tích xanh'],['custom','Tuỳ chọn (emoji/chữ)']],it.badge)}</select></label>
+    ${it.badge==='custom'?`<label>Huy hiệu tuỳ chọn<input data-l="badgeText" value="${esc(it.badgeText)}" placeholder="vd: ⭐ 👑 🟢"></label>`:'<span></span>'}
+    <label>Ngày / giờ (vd: 23:56, Mon, 26/10/26)<input data-l="time" value="${esc(it.time)}"></label>
+    <label>Dấu tick (tin của bạn)<select data-l="status">${opts([['none','Không hiện'],['sent','✓ Đã gửi'],['read','✓✓ Đã xem']],it.status)}</select></label>
+    <label>Loại tin cuối<select data-l="type">${opts([['text','Văn bản'],['photo','Ảnh (Photo)'],['file','Tệp đính kèm'],['call','Cuộc gọi'],['forward','Tin chuyển tiếp'],['draft','Bản nháp (Draft)'],['typing','Đang gõ…']],it.type)}</select></label>
+    <label>Tiền tố (vd: “Bạn:”, “Nam:”)<input data-l="prefix" value="${esc(it.prefix)}"></label>
+  </div>
+  <label>Nội dung tin cuối${it.type==='photo'?' (để trống = “Photo”)':it.type==='call'?' (để trống = “Canceled call”)':it.type==='file'?' (tên tệp)':''}<textarea data-l="text" rows="2">${esc(it.text)}</textarea></label>
+  ${it.type==='photo'?`<div class="row-btns" style="margin:0"><label class="file">🖼️ Ảnh thu nhỏ<input type="file" accept="image/*" data-lfile="thumb"></label>${it.thumb?'<button data-lact="rmthumb">Xoá ảnh thu nhỏ</button>':''}</div>`:''}
+  <div class="grid2">
+    <label>Số tin chưa đọc (0 = ẩn)<input type="number" min="0" data-l="unread" value="${it.unread}"></label>
+    <label>Làm nổi bật dòng<select data-l="hl">${opts([['none','Không'],['selected','Đang chọn (nền xanh)'],['hover','Nhạt (đang rê chuột)']],it.hl)}</select></label>
+    <label class="chk" style="padding-top:2px"><input type="checkbox" data-l="pinned"${it.pinned?' checked':''}> 📌 Ghim</label>
+    <label class="chk" style="padding-top:2px"><input type="checkbox" data-l="muted"${it.muted?' checked':''}> 🔇 Tắt thông báo</label>
+    <label class="chk" style="padding-top:2px"><input type="checkbox" data-l="online"${it.online?' checked':''}> 🟢 Đang online</label>
+  </div>
+  <div class="row-btns">
+    <button data-lact="up">↑ Lên</button><button data-lact="down">↓ Xuống</button>
+    <button data-lact="dup">⧉ Nhân bản</button><button data-lact="del" class="danger">🗑 Xoá</button>
+  </div>`;
+}
+const lf=$('#lform');
+lf.addEventListener('input',e=>{
+  const k=e.target.dataset.l, it=getL(lsel);if(!k||!it) return;
+  it[k]=e.target.type==='checkbox'?e.target.checked:e.target.type==='number'?Math.max(0,parseInt(e.target.value)||0):e.target.value;
+  renderPhone();renderLlist();save();
+  if(k==='badge'||k==='type') renderLform();
+  if(k==='name'||k==='color'){const av=lf.querySelector('.pcard>div');if(av) av.innerHTML=avatarHTML({id:'l',name:it.name,color:it.color,avatar:it.avatar},48)}
+});
+lf.addEventListener('change',e=>{
+  const k=e.target.dataset.lfile, it=getL(lsel);if(!k||!it) return;
+  readImg(e.target.files[0],k==='avatar'?256:128,url=>{it[k]=url;renderPhone();renderLform();save()});
+});
+lf.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-lact]');if(!b) return;
+  const a=b.dataset.lact, L=S.list.items, i=L.findIndex(x=>x.id===lsel);if(i<0) return;
+  if(a==='up'&&i>0){[L[i-1],L[i]]=[L[i],L[i-1]]}
+  if(a==='down'&&i<L.length-1){[L[i+1],L[i]]=[L[i],L[i+1]]}
+  if(a==='dup'){const c={...L[i],id:uid(),hl:'none'};L.splice(i+1,0,c);lsel=c.id}
+  if(a==='del'){L.splice(i,1);lsel=(L[i]||L[i-1]||{}).id||null}
+  if(a==='rmavatar') L[i].avatar='';
+  if(a==='rmthumb') L[i].thumb='';
+  renderPhone();renderLlist();renderLform();save();
+});
+function addListItem(){
+  setView('list');
+  const L=S.list.items, i=L.findIndex(x=>x.id===lsel);
+  const it={id:uid(),name:'Người mới',avatar:'',color:PALETTE[L.length%PALETTE.length],badge:'none',badgeText:'',time:nowTime(),status:'none',type:'text',prefix:'',text:'Tin nhắn mới',thumb:'',unread:0,pinned:false,muted:false,online:false,hl:'none'};
+  L.splice(i>=0?i+1:L.length,0,it);
+  renderPhone();save();selectL(it.id,true);
+}
+$('#addL').onclick=addListItem;$('#addL2').onclick=addListItem;
+const LSF=[['showHeader','Hiện thanh tiêu đề (Edit · Chats · ✎)','check'],['title','Tiêu đề','text'],['leftText','Chữ bên trái','text'],
+  ['bg','Màu nền','color'],['selBg','Nền dòng đang chọn','color'],['hoverBg','Nền dòng nhạt','color'],
+  ['accent','Màu nhấn (tick, Photo, tích xanh)','color'],['nameColor','Màu tên','color'],['subColor','Màu chữ phụ (nội dung, giờ)','color']];
+function renderLstyle(){
+  const L=S.list;
+  $('#lpresets').innerHTML=LIST_STYLES.map((p,i)=>{
+    const on=['bg','selBg','accent','nameColor'].every(k=>L[k].toLowerCase()===p[k]);
+    return `<button class="preset${on?' on':''}" data-li="${i}"><span class="pv" style="background:${p.bg};${p.bg==='#ffffff'?'box-shadow:inset 0 0 0 1px #ddd':''}"><i style="background:${p.selBg};width:100%"></i><i style="background:${p.subColor};width:70%;opacity:.5;align-self:flex-start"></i></span>${p.name}</button>`;
+  }).join('');
+  const f=LSF.filter(x=>x[2]!=='color'), c=LSF.filter(x=>x[2]==='color');
+  $('#lstyle').innerHTML=f.map(([k,l,t])=>t==='check'?`<label class="chk" style="padding:0"><input type="checkbox" data-ls="${k}"${L[k]?' checked':''}> ${l}</label>`:`<label>${l}<input data-ls="${k}" value="${esc(L[k])}"></label>`).join('')
+    +`<div class="grid2">${c.map(([k,l])=>`<label>${l}<input type="color" data-ls="${k}" value="${esc(L[k])}"></label>`).join('')}</div>`;
+}
+$('#lpresets').addEventListener('click',e=>{
+  const b=e.target.closest('[data-li]');if(!b) return;
+  const p=LIST_STYLES[+b.dataset.li];['bg','selBg','hoverBg','accent','nameColor','subColor'].forEach(k=>{S.list[k]=p[k]});
+  setView('list');renderLstyle();renderPhone();save();
+});
+$('#lstyle').addEventListener('input',e=>{
+  const k=e.target.dataset.ls;if(!k) return;
+  S.list[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;
+  setView('list');renderPhone();save();
+});
 
 function readImg(file,max,cb){
   if(!file) return;
@@ -1173,7 +1424,7 @@ function planPages(scr,inner,rows){
     if(i<rows.length) s=pos[i].top-HDR;                // tin đầu trang sau nằm ngay dưới thanh tiêu đề
   }
   const last=pages[pages.length-1];
-  if(pages.length>1) last.s=total-H;                 // trang cuối bám đáy như màn hình chat thật (tin đã xuất ở trang trước được ẩn)
+  if(pages.length>1&&view!=='list') last.s=total-H;                 // trang cuối bám đáy như màn hình chat thật (tin đã xuất ở trang trước được ẩn)
   return pages;
 }
 function showShots(shots){
@@ -1213,7 +1464,7 @@ $('#btnPng').onclick=async()=>{
 $('#mclose').onclick=()=>{$('#modal').hidden=true};
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').hidden=true});
 
-function renderAllUI(keep='bottom'){renderQbar();renderPhone(keep);renderList();renderForm();renderPeople();renderChatForm();renderCompose();$('#cTime').value=lastTime();updUndo()}
+function renderAllUI(keep='bottom'){if(!getL(lsel)) lsel=null;applyViewUI();renderLlist();renderLform();renderLstyle();renderQbar();renderPhone(view==='list'?(keep==='bottom'?'top':keep):keep);renderList();renderForm();renderPeople();renderChatForm();renderCompose();$('#cTime').value=lastTime();updUndo()}
 boot();
 
 $('#btnUndo').onclick=undo;$('#btnRedo').onclick=redo;
@@ -1221,6 +1472,7 @@ document.addEventListener('keydown',e=>{
   const t=e.target, inField=t.closest&&t.closest('input,textarea,select,[contenteditable]');
   if(e.key==='Escape'&&!$('#help').hidden){closeHelp();return}
   if(e.key==='Escape'&&!inField&&sel){deselect();return}
+  if(e.key==='Escape'&&!inField&&lsel){deselectL();return}
   if(!(e.ctrlKey||e.metaKey)||e.altKey) return;
   const k=e.key.toLowerCase();
   if(inField) return; // để ô nhập dùng hoàn tác riêng
