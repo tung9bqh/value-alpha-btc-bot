@@ -380,7 +380,13 @@ def main():
     p.add_argument("--state-dir", help="bot history folder; with --once-per-day, today's run is recorded there")
     p.add_argument("--once-per-day", action="store_true",
                    help="skip if today's calendar was already handled (guards against late/duplicate triggers)")
+    p.add_argument("--window", metavar="HH:MM-HH:MM",
+                   help="only post inside this local time window (automatic runs; GitHub schedules can be hours late)")
     args = p.parse_args()
+
+    if not args.dry_run and bot.outside_window(args.window):
+        print(f"Outside the {args.window} posting window ({datetime.now(bot.TZ):%H:%M}) - skipping.")
+        return 0
 
     marker = None
     if args.state_dir and args.once_per_day and not args.dry_run:

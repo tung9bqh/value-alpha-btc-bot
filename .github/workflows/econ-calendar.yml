@@ -46,9 +46,9 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
             python econ_calendar.py --dry-run ${{ inputs.as_of && format('--as-of {0}', inputs.as_of) || '' }} | tee preview.txt
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            python econ_calendar.py --wait-until 12:00 --state-dir state --once-per-day
+            python econ_calendar.py --wait-until 12:00 --state-dir state --once-per-day --window 11:30-14:00
           else
-            python econ_calendar.py --state-dir state --once-per-day
+            python econ_calendar.py --state-dir state --once-per-day --window 11:30-14:00
           fi
       - name: Save bot history
         if: always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)

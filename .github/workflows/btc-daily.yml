@@ -48,11 +48,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
             python btc_daily_bot.py --dry-run --state-dir state --session "${{ inputs.session || 'asia' }}" | tee preview.txt
           elif [ "${{ github.event.schedule }}" = "40 11 * * *" ]; then
-            python btc_daily_bot.py --wait-until 19:00 --state-dir state --once-per-day --session us
+            python btc_daily_bot.py --wait-until 19:00 --state-dir state --once-per-day --session us --window 18:30-21:30
           elif [ "${{ github.event_name }}" = "schedule" ]; then
-            python btc_daily_bot.py --wait-until 08:30 --state-dir state --once-per-day
+            python btc_daily_bot.py --wait-until 08:30 --state-dir state --once-per-day --window 08:00-10:30
           else
-            python btc_daily_bot.py --state-dir state --once-per-day --session "${{ inputs.session || 'asia' }}"
+            # automatic runs started by the Cloudflare scheduler (manual posts: use "Post NOW")
+            session="${{ inputs.session || 'asia' }}"
+            window=$([ "$session" = "us" ] && echo 18:30-21:30 || echo 08:00-10:30)
+            python btc_daily_bot.py --state-dir state --once-per-day --session "$session" --window "$window"
           fi
       - name: Save plan history
         if: always() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)

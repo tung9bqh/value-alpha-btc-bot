@@ -30,6 +30,13 @@ def session_of(plan):
     return plan.get("session", "asia")
 
 
+def session_date(when, session):
+    """Trading day a post belongs to: a US-session post made after midnight belongs to the evening before."""
+    if session == "us" and when.hour < 12:
+        when -= timedelta(days=1)
+    return f"{when:%Y-%m-%d}"
+
+
 def expires_at(plan):
     return plan.get("expires_at") or plan["posted_at"] + WINDOW
 
@@ -48,7 +55,12 @@ def load_plans(state_dir):
     for name in os.listdir(d):
         if name.endswith(".json"):
             with open(os.path.join(d, name)) as f:
-                plans.append(json.load(f))
+                p = json.load(f)
+            p["date"] = session_date(datetime.fromtimestamp(p["posted_at"], bot.TZ), session_of(p))
+            if name != plan_filename(p["date"], session_of(p)):  # file named for the wrong day: move it
+                os.remove(os.path.join(d, name))
+                save_plan(state_dir, p)
+            plans.append(p)
     return sorted(plans, key=lambda p: p["posted_at"])
 
 
@@ -84,7 +96,7 @@ def new_plan(analysis, now, message_ids, session="asia"):
     while (end - now).total_seconds() < 2 * 3600:
         end += timedelta(days=1)
     return {
-        "date": f"{now:%Y-%m-%d}", "session": session, "posted_at": int(now.timestamp()),
+        "date": session_date(now, session), "session": session, "posted_at": int(now.timestamp()),
         "expires_at": int(end.timestamp()), "direction": analysis["direction"],
         **{k: round(p[k], 2) for k in ("lo", "hi", "entry", "sl", "tp1", "tp2", "cancel")},
         "message_ids": message_ids, "alerts_sent": [], "recap_sent": False, "result": None,

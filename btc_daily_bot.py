@@ -737,6 +737,15 @@ def send_post(token, chat_id, text, image_path):
     return [first, second]
 
 
+def outside_window(spec, now=None):
+    """True when the local time is outside 'HH:MM-HH:MM' (a late or early automatic trigger)."""
+    if not spec:
+        return False
+    now = now or datetime.now(TZ)
+    start, end = (tuple(map(int, t.split(":"))) for t in spec.split("-"))
+    return not (start <= (now.hour, now.minute) <= end)
+
+
 def wait_until(hhmm):
     h, m = map(int, hhmm.split(":"))
     now = datetime.now(TZ)
@@ -758,12 +767,21 @@ def main():
                    help="asia = full 08:30 plan; us = short 19:00 outlook for the US session")
     p.add_argument("--once-per-day", action="store_true",
                    help="skip if today's plan is already in --state-dir (guards against late/duplicate triggers)")
+    p.add_argument("--window", metavar="HH:MM-HH:MM",
+                   help="only post inside this local time window (automatic runs; GitHub schedules can be hours late)")
     args = p.parse_args()
 
+    if not args.dry_run and outside_window(args.window):
+        print(f"Outside the {args.window} posting window ({datetime.now(TZ):%H:%M}) - skipping.")
+        return 0
+
     def already_posted():
-        today = f"{datetime.now(TZ):%Y-%m-%d}"
-        name = f"{today}{'-us' if args.session == 'us' else ''}.json"
-        return bool(args.state_dir) and os.path.exists(os.path.join(args.state_dir, "plans", name))
+        import plan_tracker
+        if not args.state_dir:
+            return False
+        plan_tracker.load_plans(args.state_dir)  # moves plans that were filed under the wrong day
+        day = plan_tracker.session_date(datetime.now(TZ), args.session)
+        return os.path.exists(os.path.join(args.state_dir, "plans", plan_tracker.plan_filename(day, args.session)))
 
     if args.session == "us" and not args.dry_run and f"{datetime.now(TZ):%Y-%m-%d}" < US_SESSION_START:
         print(f"US-session posts start on {US_SESSION_START} - skipping.")
