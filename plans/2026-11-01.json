@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-01",
+  "posted_at": 1793496678,
+  "direction": "LONG",
+  "lo": 77250,
+  "hi": 77500,
+  "entry": 77375.0,
+  "sl": 76446.5,
+  "tp1": 78303.5,
+  "tp2": 78767.75,
+  "cancel": 77050.7,
+  "message_ids": [
+    463,
+    464
+  ],
+  "alerts_sent": [
+    "skipped@1793575800"
+  ],
+  "recap_sent": true,
+  "result": {
+    "status": "skipped",
+    "r": null,
+    "events": [
+      {
+        "t": 1793575800,
+        "kind": "skipped",
+        "price": 78303.5
+      }
+    ]
+  }
+}

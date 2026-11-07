@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-07",
+  "session": "us",
+  "posted_at": 1794052848,
+  "expires_at": 1794101400,
+  "direction": "SHORT",
+  "lo": 76140,
+  "hi": 76290,
+  "entry": 76215.0,
+  "sl": 77167.69,
+  "tp1": 75452.85,
+  "tp2": 74995.56,
+  "cancel": 76550.0,
+  "message_ids": [
+    624
+  ],
+  "alerts_sent": [],
+  "recap_sent": false,
+  "result": null
+}
