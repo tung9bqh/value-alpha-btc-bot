@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-14",
+  "session": "us",
+  "posted_at": 1794657636,
+  "expires_at": 1794706200,
+  "direction": "SHORT",
+  "lo": 67430,
+  "hi": 67560,
+  "entry": 67495.0,
+  "sl": 68338.69,
+  "tp1": 66820.05,
+  "tp2": 66415.08,
+  "cancel": 67804.81,
+  "message_ids": [
+    916
+  ],
+  "alerts_sent": [
+    "skipped@1794661200"
+  ],
+  "recap_sent": false,
+  "result": null
+}

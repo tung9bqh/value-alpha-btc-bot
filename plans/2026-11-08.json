@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-08",
+  "session": "asia",
+  "posted_at": 1794101447,
+  "expires_at": 1794139200,
+  "direction": "SHORT",
+  "lo": 75990,
+  "hi": 76140,
+  "entry": 76065.0,
+  "sl": 77015.81,
+  "tp1": 75304.35,
+  "tp2": 74847.96,
+  "cancel": 76372.4,
+  "message_ids": [
+    641,
+    642
+  ],
+  "alerts_sent": [],
+  "recap_sent": true,
+  "result": {
+    "status": "expired",
+    "r": null,
+    "events": []
+  }
+}
