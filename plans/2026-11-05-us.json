@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-05",
+  "session": "us",
+  "posted_at": 1793880049,
+  "expires_at": 1793928600,
+  "direction": "LONG",
+  "lo": 79920,
+  "hi": 80080,
+  "entry": 80000.0,
+  "sl": 79000.0,
+  "tp1": 80800.0,
+  "tp2": 81280.0,
+  "cancel": 79276.05,
+  "message_ids": [
+    563
+  ],
+  "alerts_sent": [
+    "entry@1793881800",
+    "sl@1793889000"
+  ],
+  "recap_sent": true,
+  "result": {
+    "status": "sl",
+    "r": -1.0,
+    "events": [
+      {
+        "t": 1793881800,
+        "kind": "entry",
+        "price": 80000.0
+      },
+      {
+        "t": 1793889000,
+        "kind": "sl",
+        "price": 79000.0
+      }
+    ]
+  }
+}
