@@ -554,15 +554,15 @@ def draw_plan_image(data, a, now, path, session=None):
         box(0.305, 0.79, 0.135, 0.055, accent, face=bg, lw=1.6, r=0.008)
         ov.text(0.3725, 0.817, session, color=accent, fontsize=15, fontweight="bold", ha="center", va="center")
 
-    # ---- M15 chart
-    candles = data["M15"][-260:]
+    # ---- M15 chart: last ~24h, zoomed on the plan levels
+    candles = data["M15"][-96:]
     n = len(candles)
     sig = a["sig"]["M15"]
     ax = fig.add_axes([0.012, 0.06, 0.60, 0.70], facecolor=bg)
     for i, c in enumerate(candles):
         col = up if c["c"] >= c["o"] else down
-        ax.vlines(i, c["l"], c["h"], color=col, linewidth=0.8)
-        ax.bar(i, max(abs(c["c"] - c["o"]), 1e-6), bottom=min(c["o"], c["c"]), color=col, width=0.7)
+        ax.vlines(i, c["l"], c["h"], color=col, linewidth=1.1)
+        ax.bar(i, max(abs(c["c"] - c["o"]), 1e-6), bottom=min(c["o"], c["c"]), color=col, width=0.72)
     for key, col in (("e20", "#facc15"), ("e50", "#3b82f6"), ("e200", "#a855f7")):
         ys = sig[key][-n:]
         pts = [(i, y) for i, y in enumerate(ys) if y is not None]
@@ -573,22 +573,28 @@ def draw_plan_image(data, a, now, path, session=None):
     zone_mid = (p["lo"] + p["hi"]) / 2
     warn = "#f59e0b"
     levels = [p["sl"], p["tp1"], p["tp2"], p["lo"], p["hi"], p["cancel"]]
-    ys = [c["l"] for c in candles] + [c["h"] for c in candles] + levels
-    span = max(ys) - min(ys)
-    ymin, ymax = min(ys) - span * 0.06, max(ys) + span * 0.14
-    xmax = n + 50  # room on the right for the scenario arrows and the level labels
+    # y range: frame the plan (zone, SL, TPs, cancel, price); show recent candles only up to a
+    # bit beyond it, so an old spike cannot squash the zone into a thin line
+    lv_lo, lv_hi = min(levels + [price]), max(levels + [price])
+    base = lv_hi - lv_lo
+    recent = candles[-32:]
+    r_lo, r_hi = min(c["l"] for c in recent), max(c["h"] for c in recent)
+    ymin = min(lv_lo, max(r_lo, lv_lo - 0.35 * base)) - base * 0.08
+    ymax = max(lv_hi, min(r_hi, lv_hi + 0.35 * base)) + base * 0.12
+    span = ymax - ymin
+    xmax = n + 34  # room on the right for the scenario arrows and the level labels
     ax.set_xlim(-2, xmax)
     ax.set_ylim(ymin, ymax)
 
     # plan zone + SL/TP + cancel level; labels are spread so they never overlap
-    zx0 = n - 70
+    zx0 = n - 48
     ax.fill_between([zx0, xmax], p["lo"], p["hi"], color=accent, alpha=0.32, linewidth=0)
     ax.hlines([p["lo"], p["hi"]], zx0, xmax, color=accent, linewidth=1, alpha=0.8)
     marks = [("SL", p["sl"], down, (0, (5, 4))), ("TP1", p["tp1"], up, (0, (5, 4))),
              ("TP2", p["tp2"], up, (0, (5, 4))), ("CANCEL PLAN", p["cancel"], warn, (0, (8, 3, 2, 3)))]
     last_y = None
     for name, y, col, style in sorted(marks, key=lambda m: m[1]):
-        ax.hlines(y, n - 62, xmax, color=col, linestyle=style, linewidth=1.2, zorder=4)
+        ax.hlines(y, n - 40, xmax, color=col, linestyle=style, linewidth=1.3, zorder=4)
         ty = y if last_y is None else max(y, last_y + span * 0.045)
         last_y = ty
         ax.text(xmax - 0.5, ty + span * 0.008, f"{name} {k_fmt(y)}", color=col, fontsize=10, fontweight="bold",
@@ -596,24 +602,23 @@ def draw_plan_image(data, a, now, path, session=None):
                 bbox=dict(boxstyle="round,pad=0.15", facecolor=bg, edgecolor="none", alpha=0.85))
 
     # scenario arrow: retrace into the zone, then continue in the bias direction
-    x0, x1, x2 = n + 1, n + 9, n + 21
-    y_end = zone_mid - (zone_mid - price) * 2.0
-    y_end = max(y_end, ymin + span * 0.05) if short else min(y_end, ymax - span * 0.05)
+    x0, x1, x2 = n + 1, n + 5, n + 13
+    y_end = p["tp1"]  # retrace into the zone, then on to TP1
     ax.plot([x0, x1], [price, zone_mid], color=accent, linewidth=3, solid_capstyle="round", zorder=5)
     ax.annotate("", xy=(x2, y_end), xytext=(x1, zone_mid), zorder=5,
                 arrowprops=dict(arrowstyle="-|>,head_width=0.6,head_length=1.0", color=accent, linewidth=3))
 
     # cancel illustration: BTC pushes through the cancel level instead -> plan dropped
-    c_end = p["cancel"] + (span * 0.06 if short else -span * 0.06)
+    c_end = p["cancel"] + (span * 0.05 if short else -span * 0.05)
     c_end = min(max(c_end, ymin + span * 0.03), ymax - span * 0.03)
-    ax.annotate("", xy=(n + 20, c_end), xytext=(x0, price), zorder=4,
+    ax.annotate("", xy=(n + 13, c_end), xytext=(x0, price), zorder=4,
                 arrowprops=dict(arrowstyle="-|>,head_width=0.45,head_length=0.8", color=warn, linewidth=1.8,
                                 linestyle=(0, (4, 3)), alpha=0.9))
-    cross_x = x0 + (n + 20 - x0) * (p["cancel"] - price) / (c_end - price)
+    cross_x = x0 + (n + 13 - x0) * (p["cancel"] - price) / (c_end - price)
     ax.plot([cross_x], [p["cancel"]], marker="X", markersize=13, color=warn, markeredgecolor=bg, zorder=6)
 
     # callout: first spot near the zone that clears the level lines and the recent candles
-    cx = n - 48
+    cx = n - 58
     win = candles[max(0, cx - 14):cx + 14]
     c_lo, c_hi = min(c["l"] for c in win), max(c["h"] for c in win)
     half = span * 0.075
