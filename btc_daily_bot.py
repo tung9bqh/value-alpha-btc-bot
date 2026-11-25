@@ -652,9 +652,9 @@ def draw_plan_image(data, a, now, path, session=None):
     ticks, labels = [], []
     for i, c in enumerate(candles):
         t = datetime.fromtimestamp(c["t"], TZ)
-        if t.minute == 0 and t.hour in (0, 12):
+        if t.minute == 0 and t.hour % 6 == 0:
             ticks.append(i)
-            labels.append(f"{t:%d}" if t.hour == 0 else "12:00")
+            labels.append(f"{t:%d/%m}" if t.hour == 0 else f"{t:%H:00}")
     ax.set_xticks(ticks)
     ax.set_xticklabels(labels)
     ax.grid(color=grid, linewidth=0.6)
