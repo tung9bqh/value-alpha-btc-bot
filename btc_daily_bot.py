@@ -767,6 +767,8 @@ def main():
                    help="asia = full 08:30 plan; us = short 19:00 outlook for the US session")
     p.add_argument("--once-per-day", action="store_true",
                    help="skip if today's plan is already in --state-dir (guards against late/duplicate triggers)")
+    p.add_argument("--no-track", action="store_true",
+                   help="post only: no recap, and the plan is not saved for alerts/stats (extra one-off posts)")
     p.add_argument("--window", metavar="HH:MM-HH:MM",
                    help="only post inside this local time window (automatic runs; GitHub schedules can be hours late)")
     args = p.parse_args()
@@ -820,7 +822,7 @@ def main():
     if not token or not chat_id:
         print("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set (English channel only).", file=sys.stderr)
         return 2
-    if args.state_dir:
+    if args.state_dir and not args.no_track:
         import plan_tracker
         try:  # a failed recap must never block the plan; at 19:00 the outlook itself reports the morning plan
             plan_tracker.run_recaps(args.state_dir, data["M15"], now, plan_tracker.make_sender(False),
@@ -829,7 +831,7 @@ def main():
             print(f"Recap failed: {e}", file=sys.stderr)
     ids = send_post(token, chat_id, text, args.chart_out)
     print(f"Posted message(s) {ids} to {chat_id} (data: {source})")
-    if args.state_dir:
+    if args.state_dir and not args.no_track:
         plan_tracker.save_plan(args.state_dir, plan_tracker.new_plan(analysis, now, ids, session=args.session))
     return 0
 
