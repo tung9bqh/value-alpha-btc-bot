@@ -585,7 +585,7 @@ def draw_plan_image(data, a, now, path, session=None):
     ax.fill_between([zx0, xmax], p["lo"], p["hi"], color=accent, alpha=0.32, linewidth=0)
     ax.hlines([p["lo"], p["hi"]], zx0, xmax, color=accent, linewidth=1, alpha=0.8)
     marks = [("SL", p["sl"], down, (0, (5, 4))), ("TP1", p["tp1"], up, (0, (5, 4))),
-             ("TP2", p["tp2"], up, (0, (5, 4))), ("CANCEL", p["cancel"], warn, (0, (8, 3, 2, 3)))]
+             ("TP2", p["tp2"], up, (0, (5, 4))), ("CANCEL PLAN", p["cancel"], warn, (0, (8, 3, 2, 3)))]
     last_y = None
     for name, y, col, style in sorted(marks, key=lambda m: m[1]):
         ax.hlines(y, n - 62, xmax, color=col, linestyle=style, linewidth=1.2, zorder=4)
@@ -611,9 +611,6 @@ def draw_plan_image(data, a, now, path, session=None):
                                 linestyle=(0, (4, 3)), alpha=0.9))
     cross_x = x0 + (n + 20 - x0) * (p["cancel"] - price) / (c_end - price)
     ax.plot([cross_x], [p["cancel"]], marker="X", markersize=13, color=warn, markeredgecolor=bg, zorder=6)
-    ax.text(n + 20, c_end + (span * 0.015 if short else -span * 0.015), "PLAN CANCELLED", color=warn,
-            fontsize=9, fontweight="bold", ha="center", va="bottom" if short else "top", zorder=6,
-            bbox=dict(boxstyle="round,pad=0.2", facecolor=bg, edgecolor="none", alpha=0.85))
 
     # callout: first spot near the zone that clears the level lines and the recent candles
     cx = n - 48
@@ -658,8 +655,6 @@ def draw_plan_image(data, a, now, path, session=None):
     ax.grid(color=grid, linewidth=0.6)
     for sp in ax.spines.values():
         sp.set_visible(False)
-    ax.text(0.5, 0.5, CHANNEL_NAME, transform=ax.transAxes, ha="center", va="center", fontsize=40,
-            color=fg, alpha=0.05, fontweight="bold")
 
     # ---- right panel: entry conditions
     box(0.705, 0.30, 0.282, 0.555, gold, face="#0d0f14")
