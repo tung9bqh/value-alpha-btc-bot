@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-25",
+  "session": "asia",
+  "posted_at": 1795570260,
+  "expires_at": 1795608000,
+  "direction": "SHORT",
+  "lo": 59510,
+  "hi": 59630,
+  "entry": 59570.0,
+  "sl": 60314.62,
+  "tp1": 58974.3,
+  "tp2": 58616.88,
+  "cancel": 59857.07,
+  "message_ids": [
+    1381,
+    1382
+  ],
+  "alerts_sent": [
+    "skipped@1795572000"
+  ],
+  "recap_sent": true,
+  "result": {
+    "status": "skipped",
+    "r": null,
+    "events": [
+      {
+        "t": 1795572000,
+        "kind": "skipped",
+        "price": 58974.3
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-28",
+  "session": "us",
+  "posted_at": 1795867232,
+  "expires_at": 1795915800,
+  "direction": "SHORT",
+  "lo": 59360,
+  "hi": 59480,
+  "entry": 59420.0,
+  "sl": 60162.75,
+  "tp1": 58825.8,
+  "tp2": 58469.28,
+  "cancel": 59666.69,
+  "message_ids": [
+    1551
+  ],
+  "alerts_sent": [
+    "entry@1795876200"
+  ],
+  "recap_sent": false,
+  "result": null
+}
